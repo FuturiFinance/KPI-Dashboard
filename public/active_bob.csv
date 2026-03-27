@@ -1,0 +1,4 @@
+Parent Company,Market,Station,Product,AE,PSM Fusion,PSM SI,PSM CI,Contract Item Start Date,Contract End Date,Payment Method,Contract Renewal Status,Annual Contract Value
+"Sample Parent Co","Cleveland","WGAR-FM","TopLine","John Smith","Jane Doe","Bob Wilson","Mary Johnson","01/01/2025","12/31/2025","Barter","Active","$24000"
+"ABC Broadcasting","Columbus","WNCI-FM","TopicPulse","Sarah Lee","Mike Brown","","Tom Davis","03/15/2025","03/14/2026","Cash","Active","$18000"
+"XYZ Media Group","Cincinnati","WKRQ-FM","Prep+","John Smith","Jane Doe","Bob Wilson","","06/01/2024","05/31/2025","Mixed","Renewal Pending","$36000"

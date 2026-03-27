@@ -257,30 +257,53 @@
     var _activeTab = React.useState('kpi-summary');
     var activeTab = _activeTab[0], setActiveTab = _activeTab[1];
     
-    var _data = React.useState({ bob:[], cpmgi:[], err:null, loading:true });
+    var _data = React.useState({ bob:[], cpmgi:[], activeBob:[], err:null, loading:true });
     var data = _data[0], setData = _data[1];
+
+    // Active BoB filter state
+    var _activeBobFilters = React.useState({
+      parentCompany: '',
+      market: '',
+      station: '',
+      product: '',
+      ae: '',
+      psmFusion: '',
+      psmSi: '',
+      psmCi: '',
+      paymentMethod: '',
+      contractRenewalStatus: ''
+    });
+    var activeBobFilters = _activeBobFilters[0], setActiveBobFilters = _activeBobFilters[1];
+
+    // Active BoB sort state
+    var _activeBobSort = React.useState({ column: 'parentCompany', direction: 'asc' });
+    var activeBobSort = _activeBobSort[0], setActiveBobSort = _activeBobSort[1];
     
     // Load CSV data
     React.useEffect(function(){
       var bobPaths = ['/public/kpi_bob.csv','public/kpi_bob.csv','/kpi_bob.csv','kpi_bob.csv'];
       var cpmPaths = ['/public/kpi_cpmgi.csv','public/kpi_cpmgi.csv','/kpi_cpmgi.csv','kpi_cpmgi.csv'];
-      
+      var activeBobPaths = ['/public/active_bob.csv','public/active_bob.csv','/active_bob.csv','active_bob.csv'];
+
       Promise.all([
         loadCsvText(bobPaths).then(function(txt){ return { which:'bob', txt:txt }; }).catch(function(e){ return { which:'bob', err:e }; }),
-        loadCsvText(cpmPaths).then(function(txt){ return { which:'cpmgi', txt:txt }; }).catch(function(e){ return { which:'cpmgi', err:e }; })
+        loadCsvText(cpmPaths).then(function(txt){ return { which:'cpmgi', txt:txt }; }).catch(function(e){ return { which:'cpmgi', err:e }; }),
+        loadCsvText(activeBobPaths).then(function(txt){ return { which:'activeBob', txt:txt }; }).catch(function(e){ return { which:'activeBob', err:e }; })
       ]).then(function(results){
         var bobRes = results.find(function(r){ return r.which==='bob'; });
         var cpmRes = results.find(function(r){ return r.which==='cpmgi'; });
-        
+        var activeBobRes = results.find(function(r){ return r.which==='activeBob'; });
+
         var errors = [];
         if(bobRes.err) errors.push('kpi_bob.csv not found');
         if(cpmRes.err) errors.push('kpi_cpmgi.csv not found');
-        
+        // Active BoB is optional - don't error if not found
+
         if(errors.length){
-          setData({ bob:[], cpmgi:[], err: errors.join(', '), loading:false });
+          setData({ bob:[], cpmgi:[], activeBob:[], err: errors.join(', '), loading:false });
           return;
         }
-        
+
         // Parse BoB data
         var bobParsed = Papa.parse(bobRes.txt, { header:true, skipEmptyLines:true });
         var bobRows = (bobParsed.data || []).map(function(r){
@@ -300,7 +323,7 @@
             Revenue: parseMoney(r.Revenue)
           };
         }).filter(function(r){ return r._m; });
-        
+
         // Parse CPM data
         var cpmParsed = Papa.parse(cpmRes.txt, { header:true, skipEmptyLines:true });
         var cpmRows = (cpmParsed.data || []).filter(function(r){
@@ -315,7 +338,30 @@
             Weekly_Gross_Impressions: parseFloat(gi) || 0
           };
         }).filter(function(r){ return r._m; });
-        
+
+        // Parse Active BoB data (if available)
+        var activeBobRows = [];
+        if(!activeBobRes.err && activeBobRes.txt){
+          var activeBobParsed = Papa.parse(activeBobRes.txt, { header:true, skipEmptyLines:true });
+          activeBobRows = (activeBobParsed.data || []).map(function(r){
+            return {
+              parentCompany: (r['Parent Company'] || r.parentCompany || '').trim(),
+              market: (r['Market'] || r.market || '').trim(),
+              station: (r['Station'] || r.station || '').trim(),
+              product: (r['Product'] || r.product || '').trim(),
+              ae: (r['AE'] || r.ae || '').trim(),
+              psmFusion: (r['PSM Fusion'] || r.psmFusion || '').trim(),
+              psmSi: (r['PSM SI'] || r.psmSi || '').trim(),
+              psmCi: (r['PSM CI'] || r.psmCi || '').trim(),
+              contractStartDate: (r['Contract Item Start Date'] || r.contractStartDate || '').trim(),
+              contractEndDate: (r['Contract End Date'] || r.contractEndDate || '').trim(),
+              paymentMethod: (r['Payment Method'] || r.paymentMethod || '').trim(),
+              contractRenewalStatus: (r['Contract Renewal Status'] || r.contractRenewalStatus || '').trim(),
+              annualContractValue: parseMoney(r['Annual Contract Value'] || r.annualContractValue || 0)
+            };
+          }).filter(function(r){ return r.parentCompany || r.station; });
+        }
+
         // Find most recent month with data
         var latestMonth = null;
         bobRows.forEach(function(r){
@@ -324,15 +370,16 @@
           }
         });
         if(latestMonth) setAsOf(latestMonth);
-        
-        setData({ bob:bobRows, cpmgi:cpmRows, err:null, loading:false });
+
+        setData({ bob:bobRows, cpmgi:cpmRows, activeBob:activeBobRows, err:null, loading:false });
       }).catch(function(err){
-        setData({ bob:[], cpmgi:[], err: 'Error loading data: '+(err.message||err), loading:false });
+        setData({ bob:[], cpmgi:[], activeBob:[], err: 'Error loading data: '+(err.message||err), loading:false });
       });
     }, []);
     
     var bob = data.bob;
     var cpmgi = data.cpmgi;
+    var activeBob = data.activeBob;
     
     // Helper functions for data access
     function row(product, d){
@@ -940,6 +987,7 @@
         { id: 'kpi-summary', label: 'Product Counts & Revenue', icon: '📊' },
         { id: 'kpi-analytics', label: 'KPI Analytics', icon: '📈' },
         { id: 'book-of-business', label: 'Book of Business', icon: '📋' },
+        { id: 'active-bob', label: 'Active Book of Business', icon: '📒' },
         { id: 'cpm-gi', label: 'CPM & GI', icon: '📺' }
       ];
 
@@ -1252,6 +1300,205 @@
       ]);
     }
 
+    // Active Book of Business Tab Content
+    function ActiveBookOfBusinessTabContent() {
+      // Get unique values for filters
+      function getUniqueValues(field) {
+        var vals = {};
+        activeBob.forEach(function(r){ if(r[field]) vals[r[field]] = true; });
+        return Object.keys(vals).sort();
+      }
+
+      // Filter dropdown component
+      function FilterSelect(props) {
+        return e('select', {
+          className: 'bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 min-w-[120px]',
+          value: activeBobFilters[props.field] || '',
+          onChange: function(ev) {
+            var newFilters = Object.assign({}, activeBobFilters);
+            newFilters[props.field] = ev.target.value;
+            setActiveBobFilters(newFilters);
+          }
+        }, [
+          e('option', { key: '', value: '' }, 'All ' + props.label),
+          getUniqueValues(props.field).map(function(v) {
+            return e('option', { key: v, value: v }, v);
+          })
+        ]);
+      }
+
+      // Apply filters
+      var filteredData = activeBob.filter(function(r) {
+        if (activeBobFilters.parentCompany && r.parentCompany !== activeBobFilters.parentCompany) return false;
+        if (activeBobFilters.market && r.market !== activeBobFilters.market) return false;
+        if (activeBobFilters.station && r.station !== activeBobFilters.station) return false;
+        if (activeBobFilters.product && r.product !== activeBobFilters.product) return false;
+        if (activeBobFilters.ae && r.ae !== activeBobFilters.ae) return false;
+        if (activeBobFilters.psmFusion && r.psmFusion !== activeBobFilters.psmFusion) return false;
+        if (activeBobFilters.psmSi && r.psmSi !== activeBobFilters.psmSi) return false;
+        if (activeBobFilters.psmCi && r.psmCi !== activeBobFilters.psmCi) return false;
+        if (activeBobFilters.paymentMethod && r.paymentMethod !== activeBobFilters.paymentMethod) return false;
+        if (activeBobFilters.contractRenewalStatus && r.contractRenewalStatus !== activeBobFilters.contractRenewalStatus) return false;
+        return true;
+      });
+
+      // Apply sorting
+      var sortedData = filteredData.slice().sort(function(a, b) {
+        var aVal = a[activeBobSort.column] || '';
+        var bVal = b[activeBobSort.column] || '';
+        if (activeBobSort.column === 'annualContractValue') {
+          aVal = a.annualContractValue || 0;
+          bVal = b.annualContractValue || 0;
+        }
+        if (aVal < bVal) return activeBobSort.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return activeBobSort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      // Calculate KPIs
+      var totalACV = filteredData.reduce(function(sum, r) { return sum + (r.annualContractValue || 0); }, 0);
+      var activeContracts = filteredData.length;
+      var uniqueParents = {};
+      var uniqueStations = {};
+      filteredData.forEach(function(r) {
+        if (r.parentCompany) uniqueParents[r.parentCompany] = true;
+        if (r.station) uniqueStations[r.station] = true;
+      });
+
+      // Sort handler
+      function handleSort(column) {
+        if (activeBobSort.column === column) {
+          setActiveBobSort({ column: column, direction: activeBobSort.direction === 'asc' ? 'desc' : 'asc' });
+        } else {
+          setActiveBobSort({ column: column, direction: 'asc' });
+        }
+      }
+
+      // Sort indicator
+      function SortIndicator(props) {
+        if (activeBobSort.column !== props.column) return null;
+        return e('span', { className: 'ml-1' }, activeBobSort.direction === 'asc' ? '▲' : '▼');
+      }
+
+      // Sortable header
+      function SortableHeader(props) {
+        return e('th', {
+          key: props.column,
+          className: 'px-2 py-2 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-slate-200 whitespace-nowrap',
+          onClick: function() { handleSort(props.column); }
+        }, [props.label, e(SortIndicator, { key: 's', column: props.column })]);
+      }
+
+      // Clear filters
+      function clearFilters() {
+        setActiveBobFilters({
+          parentCompany: '', market: '', station: '', product: '', ae: '',
+          psmFusion: '', psmSi: '', psmCi: '', paymentMethod: '', contractRenewalStatus: ''
+        });
+      }
+
+      if (!activeBob.length) {
+        return e('div', { className: 'card p-6 text-center text-slate-400' },
+          'No Active Book of Business data available. Upload active_bob.csv to the public folder.'
+        );
+      }
+
+      return e('div', { className: 'space-y-4' }, [
+        // KPI Cards
+        e('div', { key: 'kpis', className: 'grid grid-cols-2 lg:grid-cols-4 gap-4' }, [
+          e('div', { key: 'acv', className: 'card p-4' }, [
+            e('div', { className: 'text-xs text-slate-400 mb-1' }, 'Total ACV'),
+            e('div', { className: 'text-2xl font-bold text-emerald-400' }, fmtCompact(totalACV))
+          ]),
+          e('div', { key: 'contracts', className: 'card p-4' }, [
+            e('div', { className: 'text-xs text-slate-400 mb-1' }, 'Active Contracts'),
+            e('div', { className: 'text-2xl font-bold text-blue-400' }, activeContracts.toLocaleString())
+          ]),
+          e('div', { key: 'parents', className: 'card p-4' }, [
+            e('div', { className: 'text-xs text-slate-400 mb-1' }, 'Parent Companies'),
+            e('div', { className: 'text-2xl font-bold text-purple-400' }, Object.keys(uniqueParents).length.toLocaleString())
+          ]),
+          e('div', { key: 'stations', className: 'card p-4' }, [
+            e('div', { className: 'text-xs text-slate-400 mb-1' }, 'Stations'),
+            e('div', { className: 'text-2xl font-bold text-orange-400' }, Object.keys(uniqueStations).length.toLocaleString())
+          ])
+        ]),
+
+        // Filters
+        e('div', { key: 'filters', className: 'card p-4' }, [
+          e('div', { className: 'flex items-center justify-between mb-3' }, [
+            e('h3', { key: 'h', className: 'text-sm font-semibold text-slate-300' }, 'Filters'),
+            e('button', {
+              key: 'clear',
+              className: 'text-xs text-blue-400 hover:text-blue-300',
+              onClick: clearFilters
+            }, 'Clear All')
+          ]),
+          e('div', { className: 'flex flex-wrap gap-2' }, [
+            e(FilterSelect, { key: 'f1', field: 'parentCompany', label: 'Parent Company' }),
+            e(FilterSelect, { key: 'f2', field: 'market', label: 'Market' }),
+            e(FilterSelect, { key: 'f3', field: 'station', label: 'Station' }),
+            e(FilterSelect, { key: 'f4', field: 'product', label: 'Product' }),
+            e(FilterSelect, { key: 'f5', field: 'ae', label: 'AE' }),
+            e(FilterSelect, { key: 'f6', field: 'psmFusion', label: 'PSM Fusion' }),
+            e(FilterSelect, { key: 'f7', field: 'psmSi', label: 'PSM SI' }),
+            e(FilterSelect, { key: 'f8', field: 'psmCi', label: 'PSM CI' }),
+            e(FilterSelect, { key: 'f9', field: 'paymentMethod', label: 'Payment Method' }),
+            e(FilterSelect, { key: 'f10', field: 'contractRenewalStatus', label: 'Renewal Status' })
+          ])
+        ]),
+
+        // Data Table
+        e('div', { key: 'table', className: 'card p-4' }, [
+          e('div', { className: 'flex items-center justify-between mb-3' }, [
+            e('h3', { key: 'h', className: 'text-sm font-semibold text-slate-300' }, 'Active Contracts'),
+            e('span', { key: 'count', className: 'text-xs text-slate-400' }, sortedData.length + ' records')
+          ]),
+          e('div', { className: 'overflow-x-auto' },
+            e('table', { className: 'w-full text-sm' }, [
+              e('thead', { key: 'thead' },
+                e('tr', { className: 'border-b border-slate-600' }, [
+                  e(SortableHeader, { key: 'h1', column: 'parentCompany', label: 'Parent Company' }),
+                  e(SortableHeader, { key: 'h2', column: 'market', label: 'Market' }),
+                  e(SortableHeader, { key: 'h3', column: 'station', label: 'Station' }),
+                  e(SortableHeader, { key: 'h4', column: 'product', label: 'Product' }),
+                  e(SortableHeader, { key: 'h5', column: 'ae', label: 'AE' }),
+                  e(SortableHeader, { key: 'h6', column: 'psmFusion', label: 'PSM Fusion' }),
+                  e(SortableHeader, { key: 'h7', column: 'psmSi', label: 'PSM SI' }),
+                  e(SortableHeader, { key: 'h8', column: 'psmCi', label: 'PSM CI' }),
+                  e(SortableHeader, { key: 'h9', column: 'contractStartDate', label: 'Start Date' }),
+                  e(SortableHeader, { key: 'h10', column: 'contractEndDate', label: 'End Date' }),
+                  e(SortableHeader, { key: 'h11', column: 'paymentMethod', label: 'Payment' }),
+                  e(SortableHeader, { key: 'h12', column: 'contractRenewalStatus', label: 'Renewal Status' }),
+                  e(SortableHeader, { key: 'h13', column: 'annualContractValue', label: 'ACV' })
+                ])
+              ),
+              e('tbody', { key: 'tbody' },
+                sortedData.slice(0, 500).map(function(r, i) {
+                  return e('tr', { key: i, className: 'border-t border-slate-700/30 hover:bg-slate-700/20' }, [
+                    e('td', { key: 'c1', className: 'px-2 py-2 whitespace-nowrap' }, r.parentCompany),
+                    e('td', { key: 'c2', className: 'px-2 py-2 whitespace-nowrap' }, r.market),
+                    e('td', { key: 'c3', className: 'px-2 py-2 whitespace-nowrap' }, r.station),
+                    e('td', { key: 'c4', className: 'px-2 py-2 whitespace-nowrap' }, r.product),
+                    e('td', { key: 'c5', className: 'px-2 py-2 whitespace-nowrap' }, r.ae),
+                    e('td', { key: 'c6', className: 'px-2 py-2 whitespace-nowrap' }, r.psmFusion),
+                    e('td', { key: 'c7', className: 'px-2 py-2 whitespace-nowrap' }, r.psmSi),
+                    e('td', { key: 'c8', className: 'px-2 py-2 whitespace-nowrap' }, r.psmCi),
+                    e('td', { key: 'c9', className: 'px-2 py-2 whitespace-nowrap' }, r.contractStartDate),
+                    e('td', { key: 'c10', className: 'px-2 py-2 whitespace-nowrap' }, r.contractEndDate),
+                    e('td', { key: 'c11', className: 'px-2 py-2 whitespace-nowrap' }, r.paymentMethod),
+                    e('td', { key: 'c12', className: 'px-2 py-2 whitespace-nowrap' }, r.contractRenewalStatus),
+                    e('td', { key: 'c13', className: 'px-2 py-2 whitespace-nowrap text-right font-medium text-emerald-400' }, fmtCurrency(r.annualContractValue))
+                  ]);
+                })
+              )
+            ])
+          ),
+          sortedData.length > 500 ? e('div', { className: 'text-xs text-slate-400 mt-2 text-center' }, 'Showing first 500 of ' + sortedData.length + ' records') : null
+        ])
+      ]);
+    }
+
     function renderTabContent() {
       switch (activeTab) {
         case 'kpi-summary':
@@ -1260,6 +1507,8 @@
           return e(KPIAnalyticsTabContent);
         case 'book-of-business':
           return e(BookOfBusinessTabContent);
+        case 'active-bob':
+          return e(ActiveBookOfBusinessTabContent);
         case 'cpm-gi':
           return e(CPMGITabContent);
         default:
