@@ -283,7 +283,10 @@
     React.useEffect(function(){
       var bobPaths = ['/public/kpi_bob.csv','public/kpi_bob.csv','/kpi_bob.csv','kpi_bob.csv'];
       var cpmPaths = ['/public/kpi_cpmgi.csv','public/kpi_cpmgi.csv','/kpi_cpmgi.csv','kpi_cpmgi.csv'];
-      var activeBobPaths = ['/public/active_bob.csv','public/active_bob.csv','/active_bob.csv','active_bob.csv'];
+      var activeBobPaths = [
+        'https://docs.google.com/spreadsheets/d/e/2PACX-1vSx0Pp-5H60alDG7lTOneta10phn8QwLqXhnj0SSuAxobX5oaPj206IRFywm0BMBVPSOqCeKccE8KWY/pub?gid=414930090&single=true&output=csv',
+        '/public/active_bob.csv','public/active_bob.csv','/active_bob.csv','active_bob.csv'
+      ];
 
       Promise.all([
         loadCsvText(bobPaths).then(function(txt){ return { which:'bob', txt:txt }; }).catch(function(e){ return { which:'bob', err:e }; }),
