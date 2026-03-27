@@ -3098,6 +3098,42 @@
       );
     }
 
+    // Export to CSV function
+    function exportToCsv() {
+      var headers = ['Parent Company','Market','Station','Product','AE','PSM Fusion','PSM SI','PSM CI','Contract Start Date','Contract End Date','Payment Method','Renewal Status','Annual Contract Value'];
+      var rows = sortedData.map(function(r) {
+        return [
+          r.parentCompany,
+          r.market,
+          r.station,
+          r.product,
+          r.ae,
+          r.psmFusion,
+          r.psmSi,
+          r.psmCi,
+          r.contractStartDate,
+          r.contractEndDate,
+          r.paymentMethod,
+          r.contractRenewalStatus,
+          r.annualContractValue
+        ].map(function(val) {
+          var str = String(val == null ? '' : val);
+          if (str.indexOf(',') >= 0 || str.indexOf('"') >= 0 || str.indexOf('\n') >= 0) {
+            return '"' + str.replace(/"/g, '""') + '"';
+          }
+          return str;
+        }).join(',');
+      });
+      var csv = [headers.join(',')].concat(rows).join('\n');
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.href = url;
+      link.download = 'active_book_of_business_' + new Date().toISOString().slice(0,10) + '.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
     if (!activeBob.length) {
       return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
         e('div', { className: 'max-w-[2000px] mx-auto' },
@@ -3110,9 +3146,14 @@
 
     return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800' },
       e('div', { className: 'max-w-[2000px] mx-auto px-4 lg:px-6 xl:px-8 py-6 space-y-6' }, [
-        e('div', { key: 'header', className: 'card p-4' },
-          e('h1', { className: 'text-xl font-semibold text-slate-100' }, 'Active Book of Business')
-        ),
+        e('div', { key: 'header', className: 'card p-4 flex items-center justify-between' }, [
+          e('h1', { key: 'title', className: 'text-xl font-semibold text-slate-100' }, 'Active Book of Business'),
+          e('button', {
+            key: 'export',
+            className: 'bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium',
+            onClick: exportToCsv
+          }, 'Export CSV')
+        ]),
 
         e('div', { key: 'kpis', className: 'grid grid-cols-2 lg:grid-cols-4 gap-4' }, [
           e('div', { key: 'acv', className: 'card p-4' }, [
