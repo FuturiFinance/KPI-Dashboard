@@ -3,3 +3,4 @@
 .env.rtf
 .env.txt
 .DS_Store
+.vercel
