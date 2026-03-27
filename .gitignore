@@ -1,0 +1,5 @@
+.env
+.env.bak
+.env.rtf
+.env.txt
+.DS_Store

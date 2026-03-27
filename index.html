@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SaaS Finance Dashboard</title>
+  <!-- Tailwind (CDN is fine for a quick deploy) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React + ReactDOM (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- PapaParse + Chart.js 2.x -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+  <style>
+    html,body { 
+      background: linear-gradient(135deg, #0b0f14 0%, #1e293b 100%); 
+      color: #e6eef9; 
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    
+    .card { 
+      background: rgba(18,24,33,.9); 
+      border: 1px solid #223146; 
+      border-radius: 14px; 
+      box-shadow: 0 10px 30px rgba(0,0,0,.35); 
+    }
+    
+    .pill {
+      font-size: .75rem;
+      padding: .15rem .45rem;
+      border: 1px solid #233247;
+      border-radius: 999px;
+      color: #9fb0c7;
+    }
+
+    /* Enhanced table scrolling */
+    .overflow-x-auto {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(71, 85, 105, 0.6) transparent;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    .overflow-x-auto::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .overflow-x-auto::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.6);
+      border-radius: 3px;
+    }
+
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 0.8);
+    }
+
+    /* Better table interactions */
+    table th, table td {
+      transition: background-color 0.2s ease;
+    }
+
+    /* Sticky column shadow for better visual separation */
+    .sticky {
+      box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .card {
+        margin: 0 -8px;
+        border-radius: 8px;
+      }
+    }
+
+    /* Print styles */
+    @media print {
+      .overflow-x-auto {
+        overflow: visible !important;
+      }
+      table {
+        font-size: 10px !important;
+      }
+      .sticky {
+        position: static !important;
+      }
+    }
+
+    /* Loading animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    /* Better focus states for accessibility */
+    button:focus, input:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+
+    /* Smooth transitions */
+    * {
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="root"></div>
+  <!-- Your app code LAST so React/Papa/Chart are available -->
+  <script src="./app.js"></script>
+</body>
+</html>

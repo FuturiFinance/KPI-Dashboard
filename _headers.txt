@@ -1,0 +1,2 @@
+/public/*
+  Cache-Control: public, max-age=300
