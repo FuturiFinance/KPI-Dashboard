@@ -2903,9 +2903,27 @@
 
     var _filters = React.useState({
       parentCompany: '', market: '', station: '', product: '', ae: '',
-      psmFusion: '', psmSi: '', psmCi: '', paymentMethod: '', contractRenewalStatus: ''
+      psmFusion: '', psmSi: '', psmCi: '', paymentMethod: '', contractRenewalStatus: '',
+      contractEndYears: []
     });
     var filters = _filters[0], setFilters = _filters[1];
+
+    // Extract year from date string (handles MM/DD/YYYY, YYYY-MM-DD, etc.)
+    function extractYear(dateStr) {
+      if (!dateStr) return null;
+      var match = dateStr.match(/\b(20\d{2})\b/);
+      return match ? match[1] : null;
+    }
+
+    // Get unique years from contract end dates
+    function getUniqueYears() {
+      var years = {};
+      data.activeBob.forEach(function(r) {
+        var year = extractYear(r.contractEndDate);
+        if (year) years[year] = true;
+      });
+      return Object.keys(years).sort();
+    }
 
     var _sort = React.useState({ column: 'parentCompany', direction: 'asc' });
     var sort = _sort[0], setSort = _sort[1];
@@ -2976,6 +2994,10 @@
       if (filters.psmCi && r.psmCi !== filters.psmCi) return false;
       if (filters.paymentMethod && r.paymentMethod !== filters.paymentMethod) return false;
       if (filters.contractRenewalStatus && r.contractRenewalStatus !== filters.contractRenewalStatus) return false;
+      if (filters.contractEndYears.length > 0) {
+        var rowYear = extractYear(r.contractEndDate);
+        if (!rowYear || filters.contractEndYears.indexOf(rowYear) === -1) return false;
+      }
       return true;
     });
 
@@ -3024,8 +3046,40 @@
     function clearFilters() {
       setFilters({
         parentCompany: '', market: '', station: '', product: '', ae: '',
-        psmFusion: '', psmSi: '', psmCi: '', paymentMethod: '', contractRenewalStatus: ''
+        psmFusion: '', psmSi: '', psmCi: '', paymentMethod: '', contractRenewalStatus: '',
+        contractEndYears: []
       });
+    }
+
+    // Multi-select year filter component
+    function YearMultiSelect() {
+      var years = getUniqueYears();
+      var selectedYears = filters.contractEndYears;
+
+      function toggleYear(year) {
+        var newYears;
+        if (selectedYears.indexOf(year) >= 0) {
+          newYears = selectedYears.filter(function(y) { return y !== year; });
+        } else {
+          newYears = selectedYears.concat([year]);
+        }
+        setFilters(Object.assign({}, filters, { contractEndYears: newYears }));
+      }
+
+      return e('div', { className: 'flex flex-wrap items-center gap-1' }, [
+        e('span', { key: 'label', className: 'text-xs text-slate-400 mr-1' }, 'End Year:'),
+        years.map(function(year) {
+          var isSelected = selectedYears.indexOf(year) >= 0;
+          return e('button', {
+            key: year,
+            className: 'px-2 py-1 text-xs rounded ' +
+              (isSelected
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'),
+            onClick: function() { toggleYear(year); }
+          }, year);
+        })
+      ]);
     }
 
     if (data.loading) {
@@ -3088,7 +3142,7 @@
               onClick: clearFilters
             }, 'Clear All')
           ]),
-          e('div', { className: 'flex flex-wrap gap-2' }, [
+          e('div', { className: 'flex flex-wrap gap-2 mb-3' }, [
             e(FilterSelect, { key: 'f1', field: 'parentCompany', label: 'Parent Company' }),
             e(FilterSelect, { key: 'f2', field: 'market', label: 'Market' }),
             e(FilterSelect, { key: 'f3', field: 'station', label: 'Station' }),
@@ -3099,7 +3153,8 @@
             e(FilterSelect, { key: 'f8', field: 'psmCi', label: 'PSM CI' }),
             e(FilterSelect, { key: 'f9', field: 'paymentMethod', label: 'Payment Method' }),
             e(FilterSelect, { key: 'f10', field: 'contractRenewalStatus', label: 'Renewal Status' })
-          ])
+          ]),
+          e(YearMultiSelect, { key: 'yearFilter' })
         ]),
 
         e('div', { key: 'table', className: 'card p-4' }, [
