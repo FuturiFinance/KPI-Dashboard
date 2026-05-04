@@ -1,5 +1,6 @@
 // Refresh endpoint: fetches from HubSpot and stores snapshot in Netlify Blobs
 // Can be called manually or by scheduled function
+// Force rebuild: 2026-05-04-1623
 
 const { getStore } = require('@netlify/blobs');
 

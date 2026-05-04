@@ -1,5 +1,6 @@
 // Diversification Scorecard - reads from stored snapshot
 // Snapshot is updated weekly (Monday 6am ET) or manually via refresh endpoint
+// Force rebuild: 2026-05-04-1623
 
 const { getStore } = require('@netlify/blobs');
 
