@@ -1,11 +1,9 @@
 [build]
   publish = "."
   functions = "netlify/functions"
-  command = "echo 'Build triggered at $(date)'"
 
 [build.environment]
   NODE_VERSION = "18"
-  FORCE_REBUILD = "2026-05-04-1340"
 
 [functions]
   node_bundler = "esbuild"
@@ -13,11 +11,6 @@
 [[redirects]]
   from = "/api/diversification"
   to = "/.netlify/functions/diversification"
-  status = 200
-
-[[redirects]]
-  from = "/api/diversification-refresh"
-  to = "/.netlify/functions/refresh"
   status = 200
 
 [[redirects]]
