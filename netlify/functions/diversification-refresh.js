@@ -33,8 +33,14 @@ const TARGETS = {
   CLOSED_WON: { july20: 1, yearEnd: 3 },
 };
 
-const YEAR_START = new Date('2026-01-01T00:00:00-05:00');
+// Mandate start date - May 4, 2026 (fixed, not dynamic)
+const MANDATE_START = new Date('2026-05-04T00:00:00-04:00');
 const JULY_20 = new Date('2026-07-20T23:59:59-04:00');
+const YEAR_END = new Date('2026-12-31T23:59:59-05:00');
+
+// Window lengths in days
+const DAYS_TO_JULY_20 = 77;  // May 4 to July 20
+const DAYS_TO_YEAR_END = 241;  // May 4 to Dec 31
 
 function getHeaders() {
   return {
@@ -80,22 +86,27 @@ async function searchDeals(stageIds) {
   return results;
 }
 
-function calculatePace(target) {
+function calculatePace(julyTarget) {
   const now = new Date();
-  const daysElapsed = Math.floor((now - YEAR_START) / (1000 * 60 * 60 * 24));
-  const daysToJuly20 = Math.floor((JULY_20 - YEAR_START) / (1000 * 60 * 60 * 24));
-  const expectedByNow = (daysElapsed / daysToJuly20) * target;
+  const daysElapsed = Math.max(0, Math.floor((now - MANDATE_START) / (1000 * 60 * 60 * 24)));
+  const expectedByNow = (daysElapsed / DAYS_TO_JULY_20) * julyTarget;
 
   return {
     daysElapsed,
-    daysToJuly20,
+    totalDays: DAYS_TO_JULY_20,
     expectedByNow: Math.round(expectedByNow * 10) / 10,
-    pacePercent: (daysElapsed / daysToJuly20) * 100,
+    pacePercent: Math.round((daysElapsed / DAYS_TO_JULY_20) * 1000) / 10,
   };
 }
 
-function getStatus(actual, target) {
-  const pace = calculatePace(target);
+function getStatus(actual, julyTarget) {
+  const pace = calculatePace(julyTarget);
+
+  // On day 0 (or before mandate start), expected is 0, so any count is green
+  if (pace.expectedByNow <= 0) {
+    return 'green';
+  }
+
   const achievementPercent = (actual / pace.expectedByNow) * 100;
 
   if (achievementPercent >= 100) return 'green';
@@ -195,8 +206,8 @@ async function fetchDiversificationData() {
     conversionRates,
     pace: {
       daysElapsed: pace.daysElapsed,
-      daysToJuly20: pace.daysToJuly20,
-      percentComplete: Math.round(pace.pacePercent * 10) / 10,
+      totalDays: pace.totalDays,
+      percentComplete: pace.pacePercent,
     },
     meta: {
       lastUpdated: new Date().toISOString(),
