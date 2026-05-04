@@ -1,6 +1,5 @@
 // Diversification Scorecard - reads from stored snapshot
 // Snapshot is updated weekly (Monday 6am ET) or manually via refresh endpoint
-// Build marker: 2026-05-04-v2
 
 const { getStore, connectLambda } = require('@netlify/blobs');
 
@@ -35,13 +34,10 @@ exports.handler = async (event, context) => {
           error: 'No snapshot available',
           message: 'No diversification data has been captured yet. Click "Refresh Data" to fetch from HubSpot.',
           errorType: 'NO_SNAPSHOT',
-          buildVersion: 'v2-blob-read',
         }),
       };
     }
 
-    // Add version marker to track which code is running
-    data._buildVersion = 'v2-blob-read';
     return {
       statusCode: 200,
       headers,
