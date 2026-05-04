@@ -987,7 +987,6 @@
 
     function TabNavigation() {
       var tabs = [
-        { id: 'diversification', label: 'Diversification', icon: '🎯' },
         { id: 'kpi-summary', label: 'Product Counts & Revenue', icon: '📊' },
         { id: 'kpi-analytics', label: 'KPI Analytics', icon: '📈' },
         { id: 'book-of-business', label: 'Book of Business', icon: '📋' },
@@ -1502,125 +1501,8 @@
       ]);
     }
 
-    // Diversification Scorecard Tab
-    function DiversificationTabContent() {
-      var _state = React.useState({ data: null, loading: true, error: null });
-      var state = _state[0], setState = _state[1];
-
-      React.useEffect(function() {
-        fetch('/api/diversification')
-          .then(function(res) {
-            if (!res.ok) throw new Error('Failed to fetch: ' + res.status);
-            return res.json();
-          })
-          .then(function(data) {
-            setState({ data: data, loading: false, error: null });
-          })
-          .catch(function(err) {
-            setState({ data: null, loading: false, error: err.message });
-          });
-      }, []);
-
-      if (state.loading) {
-        return e('div', { className: 'card p-8 text-center' },
-          e('div', { className: 'text-slate-400' }, 'Loading diversification data...')
-        );
-      }
-
-      if (state.error) {
-        return e('div', { className: 'card p-8 text-center' }, [
-          e('h3', { key: 'h', className: 'text-lg font-semibold mb-3 text-rose-400' }, 'Error Loading Data'),
-          e('div', { key: 'm', className: 'text-slate-400' }, state.error),
-          e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4' }, 'Ensure HUBSPOT_ACCESS_TOKEN is configured in Netlify environment variables.')
-        ]);
-      }
-
-      var data = state.data;
-
-      // Status indicator dot
-      function StatusDot(status) {
-        var colors = {
-          green: 'bg-emerald-500',
-          yellow: 'bg-amber-500',
-          red: 'bg-rose-500'
-        };
-        return e('span', {
-          className: 'inline-block w-3 h-3 rounded-full mr-2 ' + (colors[status] || 'bg-slate-500')
-        });
-      }
-
-      // Funnel Tile component
-      function FunnelTile(tile) {
-        var isInfo = tile.isInformational;
-        var cardClass = 'card p-5 ' + (isInfo ? 'border-slate-600 bg-slate-800/50' : '');
-
-        return e('div', { key: tile.id, className: cardClass }, [
-          e('div', { key: 'header', className: 'flex items-center justify-between mb-2' }, [
-            e('span', { key: 'label', className: 'text-sm font-medium text-slate-300' }, tile.label),
-            !isInfo && tile.status ? StatusDot(tile.status) : null
-          ]),
-          e('div', { key: 'count', className: 'text-3xl font-bold text-white mb-2' }, tile.count),
-          !isInfo ? e('div', { key: 'targets', className: 'text-xs text-slate-400 space-y-1' }, [
-            e('div', { key: 'j20' }, 'July 20 target: ' + tile.count + ' / ' + tile.targetJuly20),
-            e('div', { key: 'ye' }, 'Year-end target: ' + tile.targetYE)
-          ]) : e('div', { key: 'subtitle', className: 'text-xs text-slate-500 italic' }, tile.subtitle)
-        ]);
-      }
-
-      // Conversion Rate Card
-      function ConversionCard(rate) {
-        var pct = rate.percent.toFixed(1) + '%';
-        var raw = rate.numerator + ' of ' + rate.denominator;
-
-        return e('div', { key: rate.id, className: 'card p-5' }, [
-          e('div', { key: 'label', className: 'text-sm font-medium text-slate-300 mb-2' }, rate.label),
-          rate.subtitle ? e('div', { key: 'sub', className: 'text-xs text-slate-500 mb-2' }, rate.subtitle) : null,
-          e('div', { key: 'pct', className: 'text-2xl font-bold text-white' }, pct),
-          e('div', { key: 'raw', className: 'text-sm text-slate-400 mt-1' }, raw)
-        ]);
-      }
-
-      return e('div', { className: 'space-y-6' }, [
-        // Header
-        e('div', { key: 'header', className: 'card p-6' }, [
-          e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
-          e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Live HubSpot data, refreshed daily. Targets per board mandate (July 20 / YE).'),
-          data.pace ? e('div', { key: 'pace', className: 'text-xs text-slate-500 mt-3' },
-            'Progress: ' + data.pace.percentComplete + '% through H1 (' + data.pace.daysElapsed + ' of ' + data.pace.daysToJuly20 + ' days to July 20)'
-          ) : null
-        ]),
-
-        // Row 1: Funnel Tiles
-        e('div', { key: 'tiles', className: 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4' },
-          data.tiles.map(function(tile) { return FunnelTile(tile); })
-        ),
-
-        // Row 2: Conversion Rates
-        e('div', { key: 'rates-section' }, [
-          e('h2', { key: 'h', className: 'text-lg font-semibold text-slate-200 mb-4' }, 'Conversion Rates'),
-          e('div', { key: 'rates', className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
-            data.conversionRates.map(function(rate) { return ConversionCard(rate); })
-          )
-        ]),
-
-        // Footer
-        e('div', { key: 'footer', className: 'card p-4 text-center text-xs text-slate-500' }, [
-          e('div', { key: 'time' }, 'Last updated: ' + new Date(data.meta.lastUpdated).toLocaleString()),
-          data.meta.hubspotViewUrl ? e('a', {
-            key: 'link',
-            href: data.meta.hubspotViewUrl,
-            target: '_blank',
-            rel: 'noopener noreferrer',
-            className: 'text-blue-400 hover:text-blue-300 underline block mt-2'
-          }, 'View in HubSpot') : null
-        ])
-      ]);
-    }
-
     function renderTabContent() {
       switch (activeTab) {
-        case 'diversification':
-          return e(DiversificationTabContent);
         case 'kpi-summary':
           return e(KPISummaryTables);
         case 'kpi-analytics':
@@ -3014,6 +2896,131 @@
     );
   }
 
+  /* ------------------------ Diversification Screen ------------------------ */
+  function DiversificationScreen() {
+    var _state = React.useState({ data: null, loading: true, error: null });
+    var state = _state[0], setState = _state[1];
+
+    React.useEffect(function() {
+      fetch('/api/diversification')
+        .then(function(res) {
+          if (!res.ok) throw new Error('Failed to fetch: ' + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          setState({ data: data, loading: false, error: null });
+        })
+        .catch(function(err) {
+          setState({ data: null, loading: false, error: err.message });
+        });
+    }, []);
+
+    if (state.loading) {
+      return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
+        e('div', { className: 'max-w-6xl mx-auto' },
+          e('div', { className: 'card p-8 text-center' },
+            e('div', { className: 'text-slate-400' }, 'Loading diversification data...')
+          )
+        )
+      );
+    }
+
+    if (state.error) {
+      return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
+        e('div', { className: 'max-w-6xl mx-auto' },
+          e('div', { className: 'card p-8 text-center' }, [
+            e('h3', { key: 'h', className: 'text-lg font-semibold mb-3 text-rose-400' }, 'Error Loading Data'),
+            e('div', { key: 'm', className: 'text-slate-400' }, state.error),
+            e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4' }, 'Ensure HUBSPOT_ACCESS_TOKEN is configured in Netlify environment variables.')
+          ])
+        )
+      );
+    }
+
+    var data = state.data;
+
+    // Status indicator dot
+    function StatusDot(status) {
+      var colors = {
+        green: 'bg-emerald-500',
+        yellow: 'bg-amber-500',
+        red: 'bg-rose-500'
+      };
+      return e('span', {
+        className: 'inline-block w-3 h-3 rounded-full ml-2 ' + (colors[status] || 'bg-slate-500')
+      });
+    }
+
+    // Funnel Tile component
+    function FunnelTile(tile) {
+      var isInfo = tile.isInformational;
+      var cardClass = 'card p-5 ' + (isInfo ? 'border-dashed border-slate-600 bg-slate-800/30' : '');
+
+      return e('div', { key: tile.id, className: cardClass }, [
+        e('div', { key: 'header', className: 'flex items-center justify-between mb-2' }, [
+          e('span', { key: 'label', className: 'text-sm font-medium text-slate-300' }, tile.label),
+          !isInfo && tile.status ? StatusDot(tile.status) : null
+        ]),
+        e('div', { key: 'count', className: 'text-3xl font-bold text-white mb-2' }, tile.count),
+        !isInfo ? e('div', { key: 'targets', className: 'text-xs text-slate-400 space-y-1' }, [
+          e('div', { key: 'j20' }, 'July 20 target: ' + tile.count + ' / ' + tile.targetJuly20),
+          e('div', { key: 'ye' }, 'Year-end target: ' + tile.targetYE)
+        ]) : e('div', { key: 'subtitle', className: 'text-xs text-slate-500 italic' }, tile.subtitle)
+      ]);
+    }
+
+    // Conversion Rate Card
+    function ConversionCard(rate) {
+      var pct = rate.percent.toFixed(1) + '%';
+      var raw = rate.numerator + ' of ' + rate.denominator;
+
+      return e('div', { key: rate.id, className: 'card p-5' }, [
+        e('div', { key: 'label', className: 'text-sm font-medium text-slate-300 mb-2' }, rate.label),
+        rate.subtitle ? e('div', { key: 'sub', className: 'text-xs text-slate-500 mb-2' }, rate.subtitle) : null,
+        e('div', { key: 'pct', className: 'text-2xl font-bold text-white' }, pct),
+        e('div', { key: 'raw', className: 'text-sm text-slate-400 mt-1' }, raw)
+      ]);
+    }
+
+    return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
+      e('div', { className: 'max-w-6xl mx-auto space-y-6' }, [
+        // Header
+        e('div', { key: 'header', className: 'card p-6' }, [
+          e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
+          e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Live HubSpot data, refreshed daily. Targets per board mandate (July 20 / YE).'),
+          data.pace ? e('div', { key: 'pace', className: 'text-xs text-slate-500 mt-3' },
+            'Progress: ' + data.pace.percentComplete + '% through H1 (' + data.pace.daysElapsed + ' of ' + data.pace.daysToJuly20 + ' days to July 20)'
+          ) : null
+        ]),
+
+        // Row 1: Funnel Tiles
+        e('div', { key: 'tiles', className: 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4' },
+          data.tiles.map(function(tile) { return FunnelTile(tile); })
+        ),
+
+        // Row 2: Conversion Rates
+        e('div', { key: 'rates-section' }, [
+          e('h2', { key: 'h', className: 'text-lg font-semibold text-slate-200 mb-4' }, 'Conversion Rates'),
+          e('div', { key: 'rates', className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
+            data.conversionRates.map(function(rate) { return ConversionCard(rate); })
+          )
+        ]),
+
+        // Footer
+        e('div', { key: 'footer', className: 'card p-4 text-center text-xs text-slate-500' }, [
+          e('div', { key: 'time' }, 'Last updated: ' + new Date(data.meta.lastUpdated).toLocaleString()),
+          data.meta.hubspotViewUrl ? e('a', {
+            key: 'link',
+            href: data.meta.hubspotViewUrl,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            className: 'text-blue-400 hover:text-blue-300 underline block mt-2'
+          }, 'View in HubSpot') : null
+        ])
+      ])
+    );
+  }
+
   /* ------------------------ Standalone Active BoB Screen ------------------------ */
   function ActiveBoBScreen(){
     var _data = React.useState({ activeBob: [], loading: true, err: null });
@@ -3385,7 +3392,8 @@
     return e('main',{className:'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6'},
       e('div',{className:'max-w-4xl mx-auto space-y-6'},
         e('h1',{className:'text-xl font-semibold text-slate-100'},'Futuri Dashboard — Choose a module'),
-        e('div',{className:'grid grid-cols-1 md:grid-cols-2 gap-4'},[
+        e('div',{className:'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'},[
+          Tile('Diversification','Non-broadcast pipeline from HubSpot.',function(){props.onRoute('diversification');},false),
           Tile('Active Book of Business','Live contract data from Google Sheets.',function(){props.onRoute('active-bob');},true),
           Tile('Financials','Password protected financial data.',function(){props.onRoute('financials');},false),
           Tile('KPI Package','Data-driven KPIs from CSV.',function(){props.onRoute('kpi');},false),
@@ -3403,7 +3411,8 @@
         e('div',{className:'text-sm text-slate-500'},'Futuri Dashboard')
       );
     }
-    var body = (route==='financials') ? e(PasswordGate,null,e(FinancialsScreen))
+    var body = (route==='diversification') ? e(PasswordGate,null,e(DiversificationScreen))
+             : (route==='financials') ? e(PasswordGate,null,e(FinancialsScreen))
              : (route==='kpi')        ? e(PasswordGate,null,e(KPIScreen))
              : (route==='pacing')     ? e(PasswordGate,null,e(PacingScreen))
              : (route==='active-bob') ? e(ActiveBoBScreen)
