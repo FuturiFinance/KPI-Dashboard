@@ -2901,6 +2901,29 @@
     var _state = React.useState({ data: null, loading: true, error: null, errorDetails: null, refreshing: false });
     var state = _state[0], setState = _state[1];
 
+    // Modal state - must be at top level before any early returns
+    var _modal = React.useState({ isOpen: false, title: '', deals: [], category: '' });
+    var modal = _modal[0], setModal = _modal[1];
+
+    function openModal(title, category, deals) {
+      setModal({ isOpen: true, title: title, deals: deals || [], category: category });
+    }
+
+    function closeModal() {
+      setModal({ isOpen: false, title: '', deals: [], category: '' });
+    }
+
+    // Handle ESC key to close modal
+    React.useEffect(function() {
+      function handleKeyDown(e) {
+        if (e.key === 'Escape' && modal.isOpen) {
+          closeModal();
+        }
+      }
+      document.addEventListener('keydown', handleKeyDown);
+      return function() { document.removeEventListener('keydown', handleKeyDown); };
+    }, [modal.isOpen]);
+
     function loadData() {
       fetch('/api/diversification')
         .then(function(res) {
@@ -2976,29 +2999,6 @@
     }
 
     var data = state.data;
-
-    // Modal state: { isOpen: bool, title: string, deals: array, category: string }
-    var _modal = React.useState({ isOpen: false, title: '', deals: [], category: '' });
-    var modal = _modal[0], setModal = _modal[1];
-
-    function openModal(title, category, deals) {
-      setModal({ isOpen: true, title: title, deals: deals || [], category: category });
-    }
-
-    function closeModal() {
-      setModal({ isOpen: false, title: '', deals: [], category: '' });
-    }
-
-    // Handle ESC key to close modal
-    React.useEffect(function() {
-      function handleKeyDown(e) {
-        if (e.key === 'Escape' && modal.isOpen) {
-          closeModal();
-        }
-      }
-      document.addEventListener('keydown', handleKeyDown);
-      return function() { document.removeEventListener('keydown', handleKeyDown); };
-    }, [modal.isOpen]);
 
     // Modal component
     function DealModal() {
