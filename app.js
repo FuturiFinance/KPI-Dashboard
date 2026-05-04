@@ -2977,6 +2977,105 @@
 
     var data = state.data;
 
+    // Modal state: { isOpen: bool, title: string, deals: array, category: string }
+    var _modal = React.useState({ isOpen: false, title: '', deals: [], category: '' });
+    var modal = _modal[0], setModal = _modal[1];
+
+    function openModal(title, category, deals) {
+      setModal({ isOpen: true, title: title, deals: deals || [], category: category });
+    }
+
+    function closeModal() {
+      setModal({ isOpen: false, title: '', deals: [], category: '' });
+    }
+
+    // Handle ESC key to close modal
+    React.useEffect(function() {
+      function handleKeyDown(e) {
+        if (e.key === 'Escape' && modal.isOpen) {
+          closeModal();
+        }
+      }
+      document.addEventListener('keydown', handleKeyDown);
+      return function() { document.removeEventListener('keydown', handleKeyDown); };
+    }, [modal.isOpen]);
+
+    // Modal component
+    function DealModal() {
+      if (!modal.isOpen) return null;
+
+      var deals = modal.deals || [];
+
+      // Format currency
+      function fmtMoney(n) {
+        if (n == null) return '—';
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+      }
+
+      // Format date
+      function fmtDate(dateStr) {
+        if (!dateStr) return '—';
+        var d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      return e('div', {
+        className: 'fixed inset-0 z-50 flex items-center justify-center p-4',
+        onClick: function(evt) { if (evt.target === evt.currentTarget) closeModal(); },
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-labelledby': 'modal-title'
+      }, [
+        // Backdrop
+        e('div', { key: 'backdrop', className: 'absolute inset-0 bg-black/60 backdrop-blur-sm' }),
+        // Modal content
+        e('div', {
+          key: 'content',
+          className: 'relative bg-slate-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-700',
+          onClick: function(evt) { evt.stopPropagation(); }
+        }, [
+          // Header
+          e('div', { key: 'header', className: 'flex items-center justify-between p-4 border-b border-slate-700' }, [
+            e('h2', { key: 'title', id: 'modal-title', className: 'text-lg font-semibold text-white' }, modal.title),
+            e('button', {
+              key: 'close',
+              className: 'text-slate-400 hover:text-white p-1 rounded transition',
+              onClick: closeModal,
+              'aria-label': 'Close modal'
+            }, e('span', { className: 'text-xl' }, '×'))
+          ]),
+          // Body
+          e('div', { key: 'body', className: 'p-4 overflow-y-auto max-h-[60vh]' },
+            deals.length === 0
+              ? e('div', { className: 'text-slate-400 text-center py-8' }, 'No deals in this category')
+              : e('div', { className: 'space-y-3' },
+                  deals.map(function(deal) {
+                    return e('a', {
+                      key: deal.id,
+                      href: deal.hubspotUrl,
+                      target: '_blank',
+                      rel: 'noopener noreferrer',
+                      className: 'block p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition border border-slate-600'
+                    }, [
+                      e('div', { key: 'name', className: 'font-medium text-white mb-1' }, deal.name),
+                      e('div', { key: 'meta', className: 'flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400' }, [
+                        e('span', { key: 'stage' }, 'Stage: ' + deal.stage),
+                        deal.amount ? e('span', { key: 'amt' }, 'Amount: ' + fmtMoney(deal.amount)) : null,
+                        deal.closeDate ? e('span', { key: 'close' }, 'Close: ' + fmtDate(deal.closeDate)) : null
+                      ]),
+                      e('div', { key: 'link', className: 'text-xs text-blue-400 mt-2' }, 'Open in HubSpot →')
+                    ]);
+                  })
+                )
+          ),
+          // Footer
+          e('div', { key: 'footer', className: 'p-4 border-t border-slate-700 text-center' },
+            e('span', { className: 'text-sm text-slate-500' }, deals.length + ' deal' + (deals.length !== 1 ? 's' : ''))
+          )
+        ])
+      ]);
+    }
+
     // Status indicator dot
     function StatusDot(status) {
       var colors = {
@@ -2989,12 +3088,22 @@
       });
     }
 
-    // Funnel Tile component
+    // Funnel Tile component - clickable to show deals
     function FunnelTile(tile) {
       var isInfo = tile.isInformational;
-      var cardClass = 'card p-5 ' + (isInfo ? 'border-dashed border-slate-600 bg-slate-800/30' : '');
+      var cardClass = 'card p-5 cursor-pointer hover:bg-slate-700/50 transition ' + (isInfo ? 'border-dashed border-slate-600 bg-slate-800/30' : '');
+      var deals = data.deals ? data.deals[tile.id] || [] : [];
 
-      return e('div', { key: tile.id, className: cardClass }, [
+      function handleClick() {
+        openModal(tile.label, tile.id, deals);
+      }
+
+      return e('button', {
+        key: tile.id,
+        className: cardClass + ' text-left w-full',
+        onClick: handleClick,
+        'aria-label': 'View ' + tile.label + ' deals'
+      }, [
         e('div', { key: 'header', className: 'flex items-center justify-between mb-2' }, [
           e('span', { key: 'label', className: 'text-sm font-medium text-slate-300' }, tile.label),
           !isInfo && tile.status ? StatusDot(tile.status) : null
@@ -3003,20 +3112,40 @@
         !isInfo ? e('div', { key: 'targets', className: 'text-xs text-slate-400 space-y-1' }, [
           e('div', { key: 'j20' }, 'July 20 target: ' + tile.count + ' / ' + tile.targetJuly20),
           e('div', { key: 'ye' }, 'Year-end target: ' + tile.targetYE)
-        ]) : e('div', { key: 'subtitle', className: 'text-xs text-slate-500 italic' }, tile.subtitle)
+        ]) : e('div', { key: 'subtitle', className: 'text-xs text-slate-500 italic' }, tile.subtitle),
+        e('div', { key: 'hint', className: 'text-xs text-blue-400 mt-2 opacity-60' }, 'Click to view deals')
       ]);
     }
 
-    // Conversion Rate Card
+    // Conversion Rate Card - clickable to show deals
     function ConversionCard(rate) {
       var pct = rate.percent.toFixed(1) + '%';
       var raw = rate.numerator + ' of ' + rate.denominator;
 
-      return e('div', { key: rate.id, className: 'card p-5' }, [
+      // Map conversion rate ID to the relevant deals category
+      var dealsCategoryMap = {
+        'conv-to-qualified': 'qualified',
+        'qualified-to-active': 'activeProposals',
+        'close-rate': 'closedWon'
+      };
+      var dealsCategory = dealsCategoryMap[rate.id] || '';
+      var deals = data.deals ? data.deals[dealsCategory] || [] : [];
+
+      function handleClick() {
+        openModal(rate.label + ' (Numerator)', dealsCategory, deals);
+      }
+
+      return e('button', {
+        key: rate.id,
+        className: 'card p-5 cursor-pointer hover:bg-slate-700/50 transition text-left w-full',
+        onClick: handleClick,
+        'aria-label': 'View ' + rate.label + ' deals'
+      }, [
         e('div', { key: 'label', className: 'text-sm font-medium text-slate-300 mb-2' }, rate.label),
         rate.subtitle ? e('div', { key: 'sub', className: 'text-xs text-slate-500 mb-2' }, rate.subtitle) : null,
         e('div', { key: 'pct', className: 'text-2xl font-bold text-white' }, pct),
-        e('div', { key: 'raw', className: 'text-sm text-slate-400 mt-1' }, raw)
+        e('div', { key: 'raw', className: 'text-sm text-slate-400 mt-1' }, raw),
+        e('div', { key: 'hint', className: 'text-xs text-blue-400 mt-2 opacity-60' }, 'Click to view deals')
       ]);
     }
 
@@ -3024,60 +3153,66 @@
     var lastUpdated = data.meta.lastUpdated ? new Date(data.meta.lastUpdated) : null;
     var lastUpdatedStr = lastUpdated ? lastUpdated.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Unknown';
 
-    return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
-      e('div', { className: 'max-w-6xl mx-auto space-y-6' }, [
-        // Header
-        e('div', { key: 'header', className: 'card p-6' }, [
-          e('div', { key: 'title-row', className: 'flex items-start justify-between' }, [
-            e('div', { key: 'titles' }, [
-              e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
-              e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Weekly snapshot from HubSpot. Targets per board mandate (July 20 / YE).')
+    return e(React.Fragment, null, [
+      // Modal for viewing deals
+      e(DealModal, { key: 'modal' }),
+
+      // Main content
+      e('main', { key: 'main', className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
+        e('div', { className: 'max-w-6xl mx-auto space-y-6' }, [
+          // Header
+          e('div', { key: 'header', className: 'card p-6' }, [
+            e('div', { key: 'title-row', className: 'flex items-start justify-between' }, [
+              e('div', { key: 'titles' }, [
+                e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
+                e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Weekly snapshot from HubSpot. Targets per board mandate (July 20 / YE).')
+              ]),
+              e('button', {
+                key: 'refresh-btn',
+                className: 'bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2 ' + (state.refreshing ? 'opacity-50 cursor-not-allowed' : ''),
+                onClick: refreshData,
+                disabled: state.refreshing
+              }, state.refreshing ? 'Refreshing...' : 'Refresh Data')
             ]),
-            e('button', {
-              key: 'refresh-btn',
-              className: 'bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2 ' + (state.refreshing ? 'opacity-50 cursor-not-allowed' : ''),
-              onClick: refreshData,
-              disabled: state.refreshing
-            }, state.refreshing ? 'Refreshing...' : 'Refresh Data')
+            data.pace ? e('div', { key: 'pace', className: 'text-xs text-slate-500 mt-3' },
+              'Progress: ' + data.pace.percentComplete + '% through H1 (' + data.pace.daysElapsed + ' of ' + data.pace.totalDays + ' days to July 20)'
+            ) : null
           ]),
-          data.pace ? e('div', { key: 'pace', className: 'text-xs text-slate-500 mt-3' },
-            'Progress: ' + data.pace.percentComplete + '% through H1 (' + data.pace.daysElapsed + ' of ' + data.pace.daysToJuly20 + ' days to July 20)'
-          ) : null
-        ]),
 
-        // Row 1: Funnel Tiles
-        e('div', { key: 'tiles', className: 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4' },
-          data.tiles.map(function(tile) { return FunnelTile(tile); })
-        ),
+          // Row 1: Funnel Tiles
+          e('div', { key: 'tiles', className: 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4' },
+            data.tiles.map(function(tile) { return FunnelTile(tile); })
+          ),
 
-        // Row 2: Conversion Rates
-        e('div', { key: 'rates-section' }, [
-          e('h2', { key: 'h', className: 'text-lg font-semibold text-slate-200 mb-4' }, 'Conversion Rates'),
-          e('div', { key: 'rates', className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
-            data.conversionRates.map(function(rate) { return ConversionCard(rate); })
-          )
-        ]),
-
-        // Footer with prominent snapshot date
-        e('div', { key: 'footer', className: 'card p-5' }, [
-          e('div', { key: 'updated', className: 'text-center mb-3' }, [
-            e('div', { key: 'label', className: 'text-xs text-slate-500 uppercase tracking-wide' }, 'Snapshot Date'),
-            e('div', { key: 'time', className: 'text-base font-medium text-slate-300 mt-1' }, lastUpdatedStr)
+          // Row 2: Conversion Rates
+          e('div', { key: 'rates-section' }, [
+            e('h2', { key: 'h', className: 'text-lg font-semibold text-slate-200 mb-4' }, 'Conversion Rates'),
+            e('div', { key: 'rates', className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
+              data.conversionRates.map(function(rate) { return ConversionCard(rate); })
+            )
           ]),
-          e('div', { key: 'links', className: 'text-center text-xs text-slate-500 pt-3 border-t border-slate-700' }, [
-            data.meta.hubspotViewUrl ? e('a', {
-              key: 'link',
-              href: data.meta.hubspotViewUrl,
-              target: '_blank',
-              rel: 'noopener noreferrer',
-              className: 'text-blue-400 hover:text-blue-300 underline'
-            }, 'View deals in HubSpot') : null,
-            e('span', { key: 'sep', className: 'mx-2' }, '·'),
-            e('span', { key: 'schedule' }, 'Auto-refreshes every Monday at 6am ET')
+
+          // Footer with prominent snapshot date
+          e('div', { key: 'footer', className: 'card p-5' }, [
+            e('div', { key: 'updated', className: 'text-center mb-3' }, [
+              e('div', { key: 'label', className: 'text-xs text-slate-500 uppercase tracking-wide' }, 'Snapshot Date'),
+              e('div', { key: 'time', className: 'text-base font-medium text-slate-300 mt-1' }, lastUpdatedStr)
+            ]),
+            e('div', { key: 'links', className: 'text-center text-xs text-slate-500 pt-3 border-t border-slate-700' }, [
+              data.meta.hubspotViewUrl ? e('a', {
+                key: 'link',
+                href: data.meta.hubspotViewUrl,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                className: 'text-blue-400 hover:text-blue-300 underline'
+              }, 'View deals in HubSpot') : null,
+              e('span', { key: 'sep', className: 'mx-2' }, '·'),
+              e('span', { key: 'schedule' }, 'Auto-refreshes every Monday at 6am ET')
+            ])
           ])
         ])
-      ])
-    );
+      )
+    ]);
   }
 
   /* ------------------------ Standalone Active BoB Screen ------------------------ */

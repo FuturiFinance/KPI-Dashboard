@@ -18,6 +18,16 @@ const STAGES = {
   CLOSED_LOST: '1608782',
 };
 
+// Human-readable stage names for display
+const STAGE_NAMES = {
+  '4906163': 'Initial Contact',
+  '4906164': 'Consideration',
+  '4906173': 'Proposal Presented',
+  '4906175': 'Contract Expected',
+  '1608781': 'Closed Won',
+  '1608782': 'Closed Lost',
+};
+
 const FUNNEL = {
   CONVERSATIONS: [STAGES.INITIAL_CONTACT, STAGES.CONSIDERATION, STAGES.PROPOSAL_PRESENTED, STAGES.CONTRACT_EXPECTED, STAGES.CLOSED_WON],
   QUALIFIED: [STAGES.CONSIDERATION, STAGES.PROPOSAL_PRESENTED, STAGES.CONTRACT_EXPECTED, STAGES.CLOSED_WON],
@@ -114,6 +124,23 @@ function getStatus(actual, julyTarget) {
   return 'red';
 }
 
+// Format a deal for frontend display
+function formatDeal(deal) {
+  const props = deal.properties || {};
+  const stageId = props.dealstage;
+
+  return {
+    id: deal.id,
+    name: props.dealname || 'Unnamed Deal',
+    stage: STAGE_NAMES[stageId] || stageId,
+    stageId: stageId,
+    amount: props.amount ? parseFloat(props.amount) : null,
+    closeDate: props.closedate || null,
+    createDate: props.createdate || null,
+    hubspotUrl: `https://app.hubspot.com/contacts/${process.env.HUBSPOT_PORTAL_ID || '6154760'}/deal/${deal.id}`,
+  };
+}
+
 async function fetchDiversificationData() {
   if (!process.env.HUBSPOT_ACCESS_TOKEN) {
     throw new Error('HUBSPOT_ACCESS_TOKEN not configured');
@@ -122,12 +149,30 @@ async function fetchDiversificationData() {
   const allStages = [...new Set([...FUNNEL.CONVERSATIONS, ...FUNNEL.CLOSED_LOST])];
   const allDeals = await searchDeals(allStages);
 
+  // Group deals by funnel category
+  const dealsByCategory = {
+    conversations: allDeals.filter(d => FUNNEL.CONVERSATIONS.includes(d.properties.dealstage)),
+    qualified: allDeals.filter(d => FUNNEL.QUALIFIED.includes(d.properties.dealstage)),
+    activeProposals: allDeals.filter(d => FUNNEL.ACTIVE_PROPOSALS.includes(d.properties.dealstage)),
+    closedWon: allDeals.filter(d => FUNNEL.CLOSED_WON.includes(d.properties.dealstage)),
+    closedLost: allDeals.filter(d => FUNNEL.CLOSED_LOST.includes(d.properties.dealstage)),
+  };
+
   const counts = {
-    conversations: allDeals.filter(d => FUNNEL.CONVERSATIONS.includes(d.properties.dealstage)).length,
-    qualified: allDeals.filter(d => FUNNEL.QUALIFIED.includes(d.properties.dealstage)).length,
-    activeProposals: allDeals.filter(d => FUNNEL.ACTIVE_PROPOSALS.includes(d.properties.dealstage)).length,
-    closedWon: allDeals.filter(d => FUNNEL.CLOSED_WON.includes(d.properties.dealstage)).length,
-    closedLost: allDeals.filter(d => FUNNEL.CLOSED_LOST.includes(d.properties.dealstage)).length,
+    conversations: dealsByCategory.conversations.length,
+    qualified: dealsByCategory.qualified.length,
+    activeProposals: dealsByCategory.activeProposals.length,
+    closedWon: dealsByCategory.closedWon.length,
+    closedLost: dealsByCategory.closedLost.length,
+  };
+
+  // Format deals for frontend display
+  const deals = {
+    conversations: dealsByCategory.conversations.map(formatDeal),
+    qualified: dealsByCategory.qualified.map(formatDeal),
+    activeProposals: dealsByCategory.activeProposals.map(formatDeal),
+    closedWon: dealsByCategory.closedWon.map(formatDeal),
+    closedLost: dealsByCategory.closedLost.map(formatDeal),
   };
 
   const pace = calculatePace(TARGETS.CONVERSATIONS.july20);
@@ -204,6 +249,7 @@ async function fetchDiversificationData() {
   return {
     tiles,
     conversionRates,
+    deals,
     pace: {
       daysElapsed: pace.daysElapsed,
       totalDays: pace.totalDays,
