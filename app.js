@@ -2898,15 +2898,14 @@
 
   /* ------------------------ Diversification Screen ------------------------ */
   function DiversificationScreen() {
-    var _state = React.useState({ data: null, loading: true, error: null, errorDetails: null });
+    var _state = React.useState({ data: null, loading: true, error: null, errorDetails: null, refreshing: false });
     var state = _state[0], setState = _state[1];
 
-    React.useEffect(function() {
+    function loadData() {
       fetch('/api/diversification')
         .then(function(res) {
           return res.json().then(function(data) {
             if (!res.ok) {
-              // API returned an error response with details
               var err = new Error(data.message || 'Unknown error');
               err.details = data;
               throw err;
@@ -2915,11 +2914,31 @@
           });
         })
         .then(function(data) {
-          setState({ data: data, loading: false, error: null, errorDetails: null });
+          setState({ data: data, loading: false, error: null, errorDetails: null, refreshing: false });
         })
         .catch(function(err) {
-          setState({ data: null, loading: false, error: err.message, errorDetails: err.details || null });
+          setState({ data: null, loading: false, error: err.message, errorDetails: err.details || null, refreshing: false });
         });
+    }
+
+    function refreshData() {
+      setState(function(prev) { return Object.assign({}, prev, { refreshing: true }); });
+      fetch('/api/diversification-refresh', { method: 'POST' })
+        .then(function(res) {
+          if (!res.ok) throw new Error('Refresh failed');
+          return res.json();
+        })
+        .then(function() {
+          // Reload data after refresh
+          loadData();
+        })
+        .catch(function(err) {
+          setState(function(prev) { return Object.assign({}, prev, { refreshing: false, error: 'Refresh failed: ' + err.message }); });
+        });
+    }
+
+    React.useEffect(function() {
+      loadData();
     }, []);
 
     if (state.loading) {
@@ -2935,31 +2954,22 @@
     if (state.error) {
       var details = state.errorDetails || {};
       var errorType = details.errorType || 'UNKNOWN';
-      var helpText = '';
-
-      if (errorType === 'CONFIG_MISSING') {
-        helpText = 'Add HUBSPOT_ACCESS_TOKEN to Netlify environment variables and redeploy.';
-      } else if (errorType === 'HUBSPOT_API') {
-        if (details.httpStatus === 401) {
-          helpText = 'Token is invalid or expired. Generate a new private app token in HubSpot.';
-        } else if (details.httpStatus === 403) {
-          helpText = 'Token lacks required scopes. Ensure crm.objects.deals.read is enabled.';
-        } else {
-          helpText = 'HubSpot API error (HTTP ' + details.httpStatus + '). Check Netlify function logs.';
-        }
-      } else if (errorType === 'NETWORK') {
-        helpText = 'Network error reaching HubSpot. Check Netlify function logs.';
-      } else {
-        helpText = 'Check Netlify Functions logs for details.';
-      }
+      var showRefreshButton = errorType === 'NO_SNAPSHOT' || errorType === 'STORAGE_ERROR';
 
       return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
         e('div', { className: 'max-w-6xl mx-auto' },
           e('div', { className: 'card p-8 text-center' }, [
-            e('h3', { key: 'h', className: 'text-lg font-semibold mb-3 text-rose-400' }, 'Error Loading Data'),
-            e('div', { key: 'm', className: 'text-slate-400 mb-2' }, state.error),
-            details.hubspotMessage ? e('div', { key: 'hs', className: 'text-xs text-slate-500 mb-2' }, 'HubSpot: ' + details.hubspotMessage) : null,
-            e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4 p-3 bg-slate-800 rounded' }, helpText)
+            e('h3', { key: 'h', className: 'text-lg font-semibold mb-3 ' + (errorType === 'NO_SNAPSHOT' ? 'text-amber-400' : 'text-rose-400') },
+              errorType === 'NO_SNAPSHOT' ? 'No Data Snapshot Available' : 'Error Loading Data'),
+            e('div', { key: 'm', className: 'text-slate-400 mb-4' }, state.error),
+            showRefreshButton ? e('button', {
+              key: 'refresh',
+              className: 'bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition ' + (state.refreshing ? 'opacity-50 cursor-not-allowed' : ''),
+              onClick: refreshData,
+              disabled: state.refreshing
+            }, state.refreshing ? 'Refreshing from HubSpot...' : 'Fetch Data from HubSpot') : null,
+            !showRefreshButton ? e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4 p-3 bg-slate-800 rounded' },
+              'Check Netlify Functions logs for details.') : null
           ])
         )
       );
@@ -3010,12 +3020,26 @@
       ]);
     }
 
+    // Format the last updated date nicely
+    var lastUpdated = data.meta.lastUpdated ? new Date(data.meta.lastUpdated) : null;
+    var lastUpdatedStr = lastUpdated ? lastUpdated.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Unknown';
+
     return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
       e('div', { className: 'max-w-6xl mx-auto space-y-6' }, [
         // Header
         e('div', { key: 'header', className: 'card p-6' }, [
-          e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
-          e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Live HubSpot data, refreshed daily. Targets per board mandate (July 20 / YE).'),
+          e('div', { key: 'title-row', className: 'flex items-start justify-between' }, [
+            e('div', { key: 'titles' }, [
+              e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
+              e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Weekly snapshot from HubSpot. Targets per board mandate (July 20 / YE).')
+            ]),
+            e('button', {
+              key: 'refresh-btn',
+              className: 'bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2 ' + (state.refreshing ? 'opacity-50 cursor-not-allowed' : ''),
+              onClick: refreshData,
+              disabled: state.refreshing
+            }, state.refreshing ? 'Refreshing...' : 'Refresh Data')
+          ]),
           data.pace ? e('div', { key: 'pace', className: 'text-xs text-slate-500 mt-3' },
             'Progress: ' + data.pace.percentComplete + '% through H1 (' + data.pace.daysElapsed + ' of ' + data.pace.daysToJuly20 + ' days to July 20)'
           ) : null
@@ -3034,16 +3058,23 @@
           )
         ]),
 
-        // Footer
-        e('div', { key: 'footer', className: 'card p-4 text-center text-xs text-slate-500' }, [
-          e('div', { key: 'time' }, 'Last updated: ' + new Date(data.meta.lastUpdated).toLocaleString()),
-          data.meta.hubspotViewUrl ? e('a', {
-            key: 'link',
-            href: data.meta.hubspotViewUrl,
-            target: '_blank',
-            rel: 'noopener noreferrer',
-            className: 'text-blue-400 hover:text-blue-300 underline block mt-2'
-          }, 'View in HubSpot') : null
+        // Footer with prominent last updated
+        e('div', { key: 'footer', className: 'card p-5' }, [
+          e('div', { key: 'updated', className: 'text-center mb-3' }, [
+            e('div', { key: 'label', className: 'text-xs text-slate-500 uppercase tracking-wide' }, 'Snapshot Date'),
+            e('div', { key: 'time', className: 'text-base font-medium text-slate-300 mt-1' }, lastUpdatedStr)
+          ]),
+          e('div', { key: 'links', className: 'text-center text-xs text-slate-500 pt-3 border-t border-slate-700' }, [
+            data.meta.hubspotViewUrl ? e('a', {
+              key: 'link',
+              href: data.meta.hubspotViewUrl,
+              target: '_blank',
+              rel: 'noopener noreferrer',
+              className: 'text-blue-400 hover:text-blue-300 underline'
+            }, 'View deals in HubSpot') : null,
+            e('span', { key: 'sep', className: 'mx-2' }, '·'),
+            e('span', { key: 'schedule' }, 'Auto-refreshes every Monday at 6am ET')
+          ])
         ])
       ])
     );
