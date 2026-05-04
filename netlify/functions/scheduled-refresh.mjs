@@ -238,7 +238,8 @@ export default async (req) => {
   }
 };
 
-// Schedule configuration - Monday at 6am ET (11:00 UTC)
+// Schedule configuration - Monday at 6am EDT (10:00 UTC)
+// Note: During EST (winter), this will run at 5am ET
 export const config = {
-  schedule: '0 11 * * 1'
+  schedule: '0 10 * * 1'
 };
