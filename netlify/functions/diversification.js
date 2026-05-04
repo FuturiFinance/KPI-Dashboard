@@ -2,7 +2,7 @@
 // Snapshot is updated weekly (Monday 6am ET) or manually via refresh endpoint
 // Build marker: 2026-05-04-v2
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 
 const STORE_NAME = 'diversification';
 const SNAPSHOT_KEY = 'current-snapshot';
@@ -20,11 +20,11 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Initialize Lambda context for Netlify Blobs
+    connectLambda(event);
+
     // Read snapshot from Netlify Blobs
-    const store = getStore(STORE_NAME, {
-      siteID: process.env.SITE_ID,
-      token: process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_FUNCTIONS_TOKEN
-    });
+    const store = getStore(STORE_NAME);
     const data = await store.get(SNAPSHOT_KEY, { type: 'json' });
 
     if (!data) {

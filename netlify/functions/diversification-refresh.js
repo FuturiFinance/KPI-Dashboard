@@ -1,7 +1,7 @@
 // Manual refresh endpoint - HTTP accessible
 // Fetches from HubSpot and stores snapshot in Netlify Blobs
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 
 const STORE_NAME = 'diversification';
 const SNAPSHOT_KEY = 'current-snapshot';
@@ -221,6 +221,9 @@ exports.handler = async (event, context) => {
   try {
     console.log('Manual refresh triggered...');
 
+    // Initialize Lambda context for Netlify Blobs
+    connectLambda(event);
+
     // Fetch fresh data from HubSpot
     const data = await fetchDiversificationData();
 
@@ -229,10 +232,7 @@ exports.handler = async (event, context) => {
     data.meta.refreshSource = 'manual';
 
     // Store in Netlify Blobs
-    const store = getStore(STORE_NAME, {
-      siteID: process.env.SITE_ID,
-      token: process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_FUNCTIONS_TOKEN
-    });
+    const store = getStore(STORE_NAME);
     await store.setJSON(SNAPSHOT_KEY, data);
 
     console.log('Manual refresh completed:', {
