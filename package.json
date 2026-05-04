@@ -1,0 +1,10 @@
+{
+  "name": "kpi-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KPI Dashboard with Netlify Functions",
+  "dependencies": {
+    "@netlify/blobs": "^8.0.0",
+    "@netlify/functions": "^2.0.0"
+  }
+}
