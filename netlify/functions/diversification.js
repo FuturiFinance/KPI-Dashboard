@@ -153,7 +153,7 @@ exports.handler = async (event, context) => {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -166,7 +166,7 @@ exports.handler = async (event, context) => {
       console.error('HUBSPOT_ACCESS_TOKEN environment variable is not set');
       return {
         statusCode: 500,
-        headers: { ...headers, 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        headers,
         body: JSON.stringify({
           error: 'Configuration error',
           message: 'HUBSPOT_ACCESS_TOKEN environment variable is not configured',
@@ -312,15 +312,9 @@ exports.handler = async (event, context) => {
       errorResponse.errorType = 'UNKNOWN';
     }
 
-    // Never cache error responses
-    const errorHeaders = {
-      ...headers,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-    };
-
     return {
       statusCode: 500,
-      headers: errorHeaders,
+      headers,
       body: JSON.stringify(errorResponse),
     };
   }
