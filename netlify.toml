@@ -14,6 +14,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/diversification-refresh"
+  to = "/.netlify/functions/diversification-refresh"
+  status = 200
+
+[[redirects]]
   from = "/api/diversification-debug"
   to = "/.netlify/functions/diversification-debug"
   status = 200

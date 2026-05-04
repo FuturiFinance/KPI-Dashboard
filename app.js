@@ -2898,7 +2898,7 @@
 
   /* ------------------------ Diversification Screen ------------------------ */
   function DiversificationScreen() {
-    var _state = React.useState({ data: null, loading: true, error: null, errorDetails: null });
+    var _state = React.useState({ data: null, loading: true, error: null, errorDetails: null, refreshing: false });
     var state = _state[0], setState = _state[1];
 
     function loadData() {
@@ -2914,10 +2914,26 @@
           });
         })
         .then(function(data) {
-          setState({ data: data, loading: false, error: null, errorDetails: null });
+          setState({ data: data, loading: false, error: null, errorDetails: null, refreshing: false });
         })
         .catch(function(err) {
-          setState({ data: null, loading: false, error: err.message, errorDetails: err.details || null });
+          setState({ data: null, loading: false, error: err.message, errorDetails: err.details || null, refreshing: false });
+        });
+    }
+
+    function refreshData() {
+      setState(function(prev) { return Object.assign({}, prev, { refreshing: true }); });
+      fetch('/api/diversification-refresh', { method: 'POST' })
+        .then(function(res) {
+          if (!res.ok) throw new Error('Refresh failed');
+          return res.json();
+        })
+        .then(function() {
+          // Reload data after refresh
+          loadData();
+        })
+        .catch(function(err) {
+          setState(function(prev) { return Object.assign({}, prev, { refreshing: false, error: 'Refresh failed: ' + err.message }); });
         });
     }
 
@@ -2936,13 +2952,24 @@
     }
 
     if (state.error) {
+      var details = state.errorDetails || {};
+      var errorType = details.errorType || 'UNKNOWN';
+      var showRefreshButton = errorType === 'NO_SNAPSHOT' || errorType === 'STORAGE_ERROR';
+
       return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
         e('div', { className: 'max-w-6xl mx-auto' },
           e('div', { className: 'card p-8 text-center' }, [
-            e('h3', { key: 'h', className: 'text-lg font-semibold mb-3 text-rose-400' }, 'Error Loading Data'),
+            e('h3', { key: 'h', className: 'text-lg font-semibold mb-3 ' + (errorType === 'NO_SNAPSHOT' ? 'text-amber-400' : 'text-rose-400') },
+              errorType === 'NO_SNAPSHOT' ? 'No Data Snapshot Available' : 'Error Loading Data'),
             e('div', { key: 'm', className: 'text-slate-400 mb-4' }, state.error),
-            e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4 p-3 bg-slate-800 rounded' },
-              'Check Netlify Functions logs for details.')
+            showRefreshButton ? e('button', {
+              key: 'refresh',
+              className: 'bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition ' + (state.refreshing ? 'opacity-50 cursor-not-allowed' : ''),
+              onClick: refreshData,
+              disabled: state.refreshing
+            }, state.refreshing ? 'Refreshing from HubSpot...' : 'Fetch Data from HubSpot') : null,
+            !showRefreshButton ? e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4 p-3 bg-slate-800 rounded' },
+              'Check Netlify Functions logs for details.') : null
           ])
         )
       );
@@ -3001,9 +3028,17 @@
       e('div', { className: 'max-w-6xl mx-auto space-y-6' }, [
         // Header
         e('div', { key: 'header', className: 'card p-6' }, [
-          e('div', { key: 'titles' }, [
-            e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
-            e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Live data from HubSpot. Targets per board mandate (July 20 / YE).')
+          e('div', { key: 'title-row', className: 'flex items-start justify-between' }, [
+            e('div', { key: 'titles' }, [
+              e('h1', { key: 'title', className: 'text-xl font-bold text-white mb-1' }, 'Diversification Scorecard — Non-Broadcast Activity'),
+              e('p', { key: 'subtitle', className: 'text-sm text-slate-400' }, 'Weekly snapshot from HubSpot. Targets per board mandate (July 20 / YE).')
+            ]),
+            e('button', {
+              key: 'refresh-btn',
+              className: 'bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2 ' + (state.refreshing ? 'opacity-50 cursor-not-allowed' : ''),
+              onClick: refreshData,
+              disabled: state.refreshing
+            }, state.refreshing ? 'Refreshing...' : 'Refresh Data')
           ]),
           data.pace ? e('div', { key: 'pace', className: 'text-xs text-slate-500 mt-3' },
             'Progress: ' + data.pace.percentComplete + '% through H1 (' + data.pace.daysElapsed + ' of ' + data.pace.daysToJuly20 + ' days to July 20)'
@@ -3023,20 +3058,23 @@
           )
         ]),
 
-        // Footer with last updated
+        // Footer with prominent snapshot date
         e('div', { key: 'footer', className: 'card p-5' }, [
           e('div', { key: 'updated', className: 'text-center mb-3' }, [
-            e('div', { key: 'label', className: 'text-xs text-slate-500 uppercase tracking-wide' }, 'Last Fetched'),
+            e('div', { key: 'label', className: 'text-xs text-slate-500 uppercase tracking-wide' }, 'Snapshot Date'),
             e('div', { key: 'time', className: 'text-base font-medium text-slate-300 mt-1' }, lastUpdatedStr)
           ]),
-          data.meta.hubspotViewUrl ? e('div', { key: 'links', className: 'text-center text-xs text-slate-500 pt-3 border-t border-slate-700' },
-            e('a', {
+          e('div', { key: 'links', className: 'text-center text-xs text-slate-500 pt-3 border-t border-slate-700' }, [
+            data.meta.hubspotViewUrl ? e('a', {
+              key: 'link',
               href: data.meta.hubspotViewUrl,
               target: '_blank',
               rel: 'noopener noreferrer',
               className: 'text-blue-400 hover:text-blue-300 underline'
-            }, 'View deals in HubSpot')
-          ) : null
+            }, 'View deals in HubSpot') : null,
+            e('span', { key: 'sep', className: 'mx-2' }, '·'),
+            e('span', { key: 'schedule' }, 'Auto-refreshes every Monday at 6am ET')
+          ])
         ])
       ])
     );
