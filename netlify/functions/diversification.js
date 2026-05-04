@@ -166,7 +166,7 @@ exports.handler = async (event, context) => {
       console.error('HUBSPOT_ACCESS_TOKEN environment variable is not set');
       return {
         statusCode: 500,
-        headers,
+        headers: { ...headers, 'Cache-Control': 'no-cache, no-store, must-revalidate' },
         body: JSON.stringify({
           error: 'Configuration error',
           message: 'HUBSPOT_ACCESS_TOKEN environment variable is not configured',
@@ -312,9 +312,15 @@ exports.handler = async (event, context) => {
       errorResponse.errorType = 'UNKNOWN';
     }
 
+    // Never cache error responses
+    const errorHeaders = {
+      ...headers,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    };
+
     return {
       statusCode: 500,
-      headers,
+      headers: errorHeaders,
       body: JSON.stringify(errorResponse),
     };
   }
