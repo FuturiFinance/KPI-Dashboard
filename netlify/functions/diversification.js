@@ -34,13 +34,22 @@ const TARGETS = {
 // Key dates
 const YEAR_START = new Date('2026-01-01T00:00:00-05:00');
 const JULY_20 = new Date('2026-07-20T23:59:59-04:00');
-const YEAR_END = new Date('2026-12-31T23:59:59-05:00');
 
 function getHeaders() {
   return {
     'Authorization': `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
     'Content-Type': 'application/json',
   };
+}
+
+// Custom error class for HubSpot API errors
+class HubSpotError extends Error {
+  constructor(status, message, details = null) {
+    super(message);
+    this.name = 'HubSpotError';
+    this.status = status;
+    this.details = details;
+  }
 }
 
 async function searchDeals(stageIds) {
@@ -61,15 +70,50 @@ async function searchDeals(stageIds) {
     };
     if (after) body.after = after;
 
-    const response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/search`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(body),
-    });
+    let response;
+    try {
+      response = await fetch(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/search`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(body),
+      });
+    } catch (networkError) {
+      throw new HubSpotError(0, `Network error connecting to HubSpot: ${networkError.message}`);
+    }
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`HubSpot API error: ${response.status} - ${error}`);
+      let errorBody = '';
+      try {
+        errorBody = await response.text();
+      } catch (e) {
+        errorBody = 'Unable to read error response';
+      }
+
+      // Parse HubSpot error response
+      let errorDetails = null;
+      try {
+        errorDetails = JSON.parse(errorBody);
+      } catch (e) {
+        errorDetails = { raw: errorBody };
+      }
+
+      // Provide specific error messages based on status
+      switch (response.status) {
+        case 401:
+          throw new HubSpotError(401, 'Authentication failed - token may be invalid or expired', errorDetails);
+        case 403:
+          throw new HubSpotError(403, 'Access denied - token may lack required scopes (needs crm.objects.deals.read)', errorDetails);
+        case 404:
+          throw new HubSpotError(404, 'Resource not found - pipeline or property may not exist', errorDetails);
+        case 429:
+          throw new HubSpotError(429, 'Rate limited by HubSpot - too many requests', errorDetails);
+        case 500:
+        case 502:
+        case 503:
+          throw new HubSpotError(response.status, 'HubSpot service error - try again later', errorDetails);
+        default:
+          throw new HubSpotError(response.status, `HubSpot API error: ${response.status}`, errorDetails);
+      }
     }
 
     const data = await response.json();
@@ -85,7 +129,6 @@ function calculatePace(target) {
   const daysElapsed = Math.floor((now - YEAR_START) / (1000 * 60 * 60 * 24));
   const daysToJuly20 = Math.floor((JULY_20 - YEAR_START) / (1000 * 60 * 60 * 24));
 
-  // Expected count by today if on pace for July 20 target
   const expectedByNow = (daysElapsed / daysToJuly20) * target;
 
   return {
@@ -106,12 +149,11 @@ function getStatus(actual, target) {
 }
 
 exports.handler = async (event, context) => {
-  // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
-    'Cache-Control': 'public, max-age=3600', // 1 hour cache
+    'Cache-Control': 'public, max-age=3600',
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -121,16 +163,27 @@ exports.handler = async (event, context) => {
   try {
     // Check for HubSpot token
     if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+      console.error('HUBSPOT_ACCESS_TOKEN environment variable is not set');
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'HUBSPOT_ACCESS_TOKEN not configured' }),
+        body: JSON.stringify({
+          error: 'Configuration error',
+          message: 'HUBSPOT_ACCESS_TOKEN environment variable is not configured',
+          errorType: 'CONFIG_MISSING',
+        }),
       };
     }
 
-    // Fetch all diversification deals (using broadest filter)
+    // Log token presence (not the actual token)
+    console.log('HUBSPOT_ACCESS_TOKEN is configured, length:', process.env.HUBSPOT_ACCESS_TOKEN.length);
+
+    // Fetch all diversification deals
     const allStages = [...new Set([...FUNNEL.CONVERSATIONS, ...FUNNEL.CLOSED_LOST])];
+    console.log('Fetching deals for stages:', allStages);
+
     const allDeals = await searchDeals(allStages);
+    console.log('Found', allDeals.length, 'diversification deals');
 
     // Count deals by funnel stage
     const counts = {
@@ -141,10 +194,8 @@ exports.handler = async (event, context) => {
       closedLost: allDeals.filter(d => FUNNEL.CLOSED_LOST.includes(d.properties.dealstage)).length,
     };
 
-    // Calculate pace info
     const pace = calculatePace(TARGETS.CONVERSATIONS.july20);
 
-    // Build tiles data
     const tiles = [
       {
         id: 'conversations',
@@ -187,7 +238,6 @@ exports.handler = async (event, context) => {
       },
     ];
 
-    // Calculate conversion rates
     const conversionRates = [
       {
         id: 'conv-to-qualified',
@@ -215,7 +265,6 @@ exports.handler = async (event, context) => {
       },
     ];
 
-    // Build response
     const response = {
       tiles,
       conversionRates,
@@ -227,7 +276,7 @@ exports.handler = async (event, context) => {
       meta: {
         lastUpdated: new Date().toISOString(),
         totalDeals: allDeals.length,
-        hubspotViewUrl: `https://app.hubspot.com/contacts/${process.env.HUBSPOT_PORTAL_ID || ''}/objects/0-3/views/all/list?query=broadcast_diversification%3Dtrue`,
+        hubspotViewUrl: `https://app.hubspot.com/contacts/${process.env.HUBSPOT_PORTAL_ID || '6154760'}/objects/0-3/views/all/list?query=broadcast_diversification%3Dtrue`,
       },
     };
 
@@ -239,13 +288,34 @@ exports.handler = async (event, context) => {
 
   } catch (error) {
     console.error('Diversification fetch error:', error);
+    console.error('Error stack:', error.stack);
+
+    // Build user-friendly error response
+    let errorResponse = {
+      error: 'Failed to fetch diversification data',
+      message: error.message,
+    };
+
+    if (error instanceof HubSpotError) {
+      errorResponse.errorType = 'HUBSPOT_API';
+      errorResponse.httpStatus = error.status;
+
+      // Include sanitized details for debugging
+      if (error.details) {
+        errorResponse.hubspotMessage = error.details.message || error.details.raw || 'No details';
+        errorResponse.hubspotCategory = error.details.category || null;
+      }
+    } else if (error.message && error.message.includes('fetch')) {
+      errorResponse.errorType = 'NETWORK';
+      errorResponse.message = 'Network error - unable to reach HubSpot API';
+    } else {
+      errorResponse.errorType = 'UNKNOWN';
+    }
+
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        error: 'Failed to fetch diversification data',
-        message: error.message,
-      }),
+      body: JSON.stringify(errorResponse),
     };
   }
 };

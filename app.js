@@ -2898,20 +2898,27 @@
 
   /* ------------------------ Diversification Screen ------------------------ */
   function DiversificationScreen() {
-    var _state = React.useState({ data: null, loading: true, error: null });
+    var _state = React.useState({ data: null, loading: true, error: null, errorDetails: null });
     var state = _state[0], setState = _state[1];
 
     React.useEffect(function() {
       fetch('/api/diversification')
         .then(function(res) {
-          if (!res.ok) throw new Error('Failed to fetch: ' + res.status);
-          return res.json();
+          return res.json().then(function(data) {
+            if (!res.ok) {
+              // API returned an error response with details
+              var err = new Error(data.message || 'Unknown error');
+              err.details = data;
+              throw err;
+            }
+            return data;
+          });
         })
         .then(function(data) {
-          setState({ data: data, loading: false, error: null });
+          setState({ data: data, loading: false, error: null, errorDetails: null });
         })
         .catch(function(err) {
-          setState({ data: null, loading: false, error: err.message });
+          setState({ data: null, loading: false, error: err.message, errorDetails: err.details || null });
         });
     }, []);
 
@@ -2926,12 +2933,33 @@
     }
 
     if (state.error) {
+      var details = state.errorDetails || {};
+      var errorType = details.errorType || 'UNKNOWN';
+      var helpText = '';
+
+      if (errorType === 'CONFIG_MISSING') {
+        helpText = 'Add HUBSPOT_ACCESS_TOKEN to Netlify environment variables and redeploy.';
+      } else if (errorType === 'HUBSPOT_API') {
+        if (details.httpStatus === 401) {
+          helpText = 'Token is invalid or expired. Generate a new private app token in HubSpot.';
+        } else if (details.httpStatus === 403) {
+          helpText = 'Token lacks required scopes. Ensure crm.objects.deals.read is enabled.';
+        } else {
+          helpText = 'HubSpot API error (HTTP ' + details.httpStatus + '). Check Netlify function logs.';
+        }
+      } else if (errorType === 'NETWORK') {
+        helpText = 'Network error reaching HubSpot. Check Netlify function logs.';
+      } else {
+        helpText = 'Check Netlify Functions logs for details.';
+      }
+
       return e('main', { className: 'min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6' },
         e('div', { className: 'max-w-6xl mx-auto' },
           e('div', { className: 'card p-8 text-center' }, [
             e('h3', { key: 'h', className: 'text-lg font-semibold mb-3 text-rose-400' }, 'Error Loading Data'),
-            e('div', { key: 'm', className: 'text-slate-400' }, state.error),
-            e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4' }, 'Ensure HUBSPOT_ACCESS_TOKEN is configured in Netlify environment variables.')
+            e('div', { key: 'm', className: 'text-slate-400 mb-2' }, state.error),
+            details.hubspotMessage ? e('div', { key: 'hs', className: 'text-xs text-slate-500 mb-2' }, 'HubSpot: ' + details.hubspotMessage) : null,
+            e('div', { key: 'note', className: 'text-xs text-slate-500 mt-4 p-3 bg-slate-800 rounded' }, helpText)
           ])
         )
       );
