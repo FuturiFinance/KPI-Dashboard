@@ -21,7 +21,10 @@ exports.handler = async (event, context) => {
 
   try {
     // Read snapshot from Netlify Blobs
-    const store = getStore(STORE_NAME);
+    const store = getStore(STORE_NAME, {
+      siteID: process.env.SITE_ID,
+      token: process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_FUNCTIONS_TOKEN
+    });
     const data = await store.get(SNAPSHOT_KEY, { type: 'json' });
 
     if (!data) {

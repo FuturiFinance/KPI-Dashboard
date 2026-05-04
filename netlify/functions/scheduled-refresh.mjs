@@ -221,7 +221,10 @@ export default async (req) => {
     data.meta.refreshSource = 'scheduled';
 
     // Store in Netlify Blobs
-    const store = getStore(STORE_NAME);
+    const store = getStore(STORE_NAME, {
+      siteID: process.env.SITE_ID,
+      token: process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_FUNCTIONS_TOKEN
+    });
     await store.setJSON(SNAPSHOT_KEY, data);
 
     console.log('Scheduled refresh completed:', {

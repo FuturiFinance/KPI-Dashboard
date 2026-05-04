@@ -229,7 +229,10 @@ exports.handler = async (event, context) => {
     data.meta.refreshSource = 'manual';
 
     // Store in Netlify Blobs
-    const store = getStore(STORE_NAME);
+    const store = getStore(STORE_NAME, {
+      siteID: process.env.SITE_ID,
+      token: process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_FUNCTIONS_TOKEN
+    });
     await store.setJSON(SNAPSHOT_KEY, data);
 
     console.log('Manual refresh completed:', {
