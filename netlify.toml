@@ -1,8 +1,20 @@
 [build]
   publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Scheduled function: refresh diversification data daily at 6am ET (11:00 UTC)
+[functions."diversification-refresh"]
+  schedule = "0 11 * * *"
+
+[[redirects]]
+  from = "/api/diversification"
+  to = "/.netlify/functions/diversification"
+  status = 200
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
