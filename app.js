@@ -237,16 +237,38 @@
   };
 
   /* ------------------------ KPI Screen ------------------------ */
-  // Product order for display
-  var ORDER = [
-    'FUSION TOTAL','POST','STREAMING','SMARTSPEAKERS','MOBILE','LDR','AUDIOAI',
-    'CONTENT INTELLIGENCE TOTAL','TOPICPULSE','PREP+',
-    'SALES INTELLIGENCE TOTAL','SPOTON','TOPLINE',
-    'TOTAL'
-  ];
-  
-  var BOLD_KEYS = ['FUSION TOTAL','CONTENT INTELLIGENCE TOTAL','SALES INTELLIGENCE TOTAL','TOTAL','ALL PRODUCTS'];
+  // New grouping structure: Fusion includes former Content Intelligence products
+  // Note: Product names are UPPERCASED when parsed from CSV (see line ~338)
+  var FUSION_PRODUCTS = ['POST','STREAMING','SMARTSPEAKERS','MOBILE','LDR','AUDIOAI','TOPICPULSE','PREP+','CONTENT AUTOMATION'];
+  var SALES_PRODUCTS = ['TOPLINE','TOPLINE ENTERPRISE','SPOTON'];
+
+  var ORDER = ['FUSION TOTAL'].concat(FUSION_PRODUCTS).concat(['SALES INTELLIGENCE TOTAL']).concat(SALES_PRODUCTS).concat(['TOTAL']);
+
+  // Display names for friendly casing (CSV key -> display name)
+  var DISPLAY_NAMES = {
+    'FUSION TOTAL': 'Fusion Total',
+    'POST': 'POST',
+    'STREAMING': 'Streaming',
+    'SMARTSPEAKERS': 'SmartSpeakers',
+    'MOBILE': 'Mobile',
+    'LDR': 'LDR',
+    'AUDIOAI': 'AudioAI',
+    'TOPICPULSE': 'TopicPulse',
+    'PREP+': 'Prep+',
+    'CONTENT AUTOMATION': 'Content Automation',
+    'SALES INTELLIGENCE TOTAL': 'Sales Intelligence Total',
+    'TOPLINE': 'TopLine',
+    'TOPLINE ENTERPRISE': 'TopLine Enterprise',
+    'SPOTON': 'SpotOn',
+    'TOTAL': 'All Products',
+    'ALL PRODUCTS': 'All Products'
+  };
+  function getDisplayName(k){ return DISPLAY_NAMES[k] || k; }
+
+  var BOLD_KEYS = ['FUSION TOTAL','SALES INTELLIGENCE TOTAL','TOTAL','ALL PRODUCTS'];
+  var INDENT_KEYS = FUSION_PRODUCTS.concat(SALES_PRODUCTS);
   function isBoldKey(k){ return BOLD_KEYS.indexOf(k.toUpperCase())>=0; }
+  function isIndentKey(k){ return INDENT_KEYS.indexOf(k)>=0; }
 
   function KPIScreen(){
     // State
@@ -502,7 +524,10 @@
       var dYoYPct = (current != null && pyCount != null && pyCount !== 0) ? (current - pyCount) / pyCount : null;
       return {
         key: key,
-        name: key === 'TOTAL' ? 'All Products' : key,
+        name: getDisplayName(key),
+        isIndent: isIndentKey(key),
+        isBold: isBoldKey(key),
+        isGrandTotal: key === 'TOTAL' || key === 'ALL PRODUCTS',
         current: current,
         pyCount: pyCount,
         yoyRetention: yoyRetention,
@@ -663,8 +688,11 @@
                 e('tbody', {key:'tb'},
                   tableData.map(function(r) {
                     var bold = isBoldKey(r.product);
-                    return e('tr', { key: r.product, className: 'border-t border-slate-700/30 ' + (bold ? 'font-semibold' : '') }, [
-                      e('td', { key:'p', className: 'py-1 px-1 text-left' }, r.product === 'TOTAL' ? 'Total' : r.product),
+                    var indent = isIndentKey(r.product);
+                    var isGrandTotal = r.product === 'TOTAL' || r.product === 'ALL PRODUCTS';
+                    var rowCls = 'border-t border-slate-700/30 ' + (bold ? 'font-semibold bg-slate-700/30 ' : '') + (isGrandTotal ? 'font-bold bg-slate-600/40' : '');
+                    return e('tr', { key: r.product, className: rowCls }, [
+                      e('td', { key:'p', className: 'py-1 text-left ' + (indent ? 'pl-4 pr-1' : 'px-1') }, getDisplayName(r.product)),
                       e('td', { key:'py', className: 'py-1 px-1 text-right' }, r.prev || 0),
                       e('td', { key:'cy', className: 'py-1 px-1 text-right' }, r.curr || 0),
                       e('td', { key:'g', className: 'py-1 px-1 text-right ' + clsDelta(r.growth, true) }, fmtPercent(r.growth))
@@ -690,8 +718,10 @@
                 e('tbody', {key:'tb'},
                   tableData.filter(function(r) { return r.product !== 'TOTAL'; }).map(function(r) {
                     var bold = isBoldKey(r.product);
-                    return e('tr', { key: r.product, className: 'border-t border-slate-700/30 ' + (bold ? 'font-semibold' : '') }, [
-                      e('td', { key:'p', className: 'py-1 px-1 text-left' }, r.product),
+                    var indent = isIndentKey(r.product);
+                    var rowCls = 'border-t border-slate-700/30 ' + (bold ? 'font-semibold bg-slate-700/30' : '');
+                    return e('tr', { key: r.product, className: rowCls }, [
+                      e('td', { key:'p', className: 'py-1 text-left ' + (indent ? 'pl-4 pr-1' : 'px-1') }, getDisplayName(r.product)),
                       e('td', { key:'py', className: 'py-1 px-1 text-right' }, (r.prevPct || 0).toFixed(1) + '%'),
                       e('td', { key:'cy', className: 'py-1 px-1 text-right' }, (r.currPct || 0).toFixed(1) + '%'),
                       e('td', { key:'c', className: 'py-1 px-1 text-right ' + clsDelta(r.pctChange, true) }, 
@@ -735,8 +765,11 @@
                 e('tbody', {key:'tb'},
                   tableData.map(function(r) {
                     var bold = isBoldKey(r.product);
-                    return e('tr', { key: r.product, className: 'border-t border-slate-700/30 ' + (bold ? 'font-semibold' : '') }, [
-                      e('td', { key:'p', className: 'py-1 px-1 text-left' }, r.product === 'TOTAL' ? 'Total' : r.product),
+                    var indent = isIndentKey(r.product);
+                    var isGrandTotal = r.product === 'TOTAL' || r.product === 'ALL PRODUCTS';
+                    var rowCls = 'border-t border-slate-700/30 ' + (bold ? 'font-semibold bg-slate-700/30 ' : '') + (isGrandTotal ? 'font-bold bg-slate-600/40' : '');
+                    return e('tr', { key: r.product, className: rowCls }, [
+                      e('td', { key:'p', className: 'py-1 text-left ' + (indent ? 'pl-4 pr-1' : 'px-1') }, getDisplayName(r.product)),
                       e('td', { key:'py', className: 'py-1 px-1 text-right' }, fmtCompactMoney(r.prev)),
                       e('td', { key:'cy', className: 'py-1 px-1 text-right' }, fmtCompactMoney(r.curr)),
                       e('td', { key:'g', className: 'py-1 px-1 text-right ' + clsDelta(r.growth, true) }, fmtPercent(r.growth))
@@ -762,8 +795,10 @@
                 e('tbody', {key:'tb'},
                   tableData.filter(function(r) { return r.product !== 'TOTAL'; }).map(function(r) {
                     var bold = isBoldKey(r.product);
-                    return e('tr', { key: r.product, className: 'border-t border-slate-700/30 ' + (bold ? 'font-semibold' : '') }, [
-                      e('td', { key:'p', className: 'py-1 px-1 text-left' }, r.product),
+                    var indent = isIndentKey(r.product);
+                    var rowCls = 'border-t border-slate-700/30 ' + (bold ? 'font-semibold bg-slate-700/30' : '');
+                    return e('tr', { key: r.product, className: rowCls }, [
+                      e('td', { key:'p', className: 'py-1 text-left ' + (indent ? 'pl-4 pr-1' : 'px-1') }, getDisplayName(r.product)),
                       e('td', { key:'py', className: 'py-1 px-1 text-right' }, (r.prevPct || 0).toFixed(1) + '%'),
                       e('td', { key:'cy', className: 'py-1 px-1 text-right' }, (r.currPct || 0).toFixed(1) + '%'),
                       e('td', { key:'c', className: 'py-1 px-1 text-right ' + clsDelta(r.pctChange, true) }, 
@@ -808,8 +843,11 @@
               e('tbody', {key:'tb'},
                 tableData.map(function(r) {
                   var bold = isBoldKey(r.product);
-                  return e('tr', { key: r.product, className: 'border-t border-slate-700/30 ' + (bold ? 'font-semibold' : '') }, [
-                    e('td', { key:'p', className: 'py-1 px-1 text-left' }, r.product === 'TOTAL' ? 'Weighted Total' : r.product),
+                  var indent = isIndentKey(r.product);
+                  var isGrandTotal = r.product === 'TOTAL' || r.product === 'ALL PRODUCTS';
+                  var rowCls = 'border-t border-slate-700/30 ' + (bold ? 'font-semibold bg-slate-700/30 ' : '') + (isGrandTotal ? 'font-bold bg-slate-600/40' : '');
+                  return e('tr', { key: r.product, className: rowCls }, [
+                    e('td', { key:'p', className: 'py-1 text-left ' + (indent ? 'pl-4 pr-1' : 'px-1') }, r.product === 'TOTAL' ? 'Weighted Total' : getDisplayName(r.product)),
                     e('td', { key:'py', className: 'py-1 px-1 text-right' }, fmtCompactMoney(r.prev)),
                     e('td', { key:'cy', className: 'py-1 px-1 text-right' }, fmtCompactMoney(r.curr)),
                     e('td', { key:'g', className: 'py-1 px-1 text-right ' + clsDelta(r.growth, true) }, fmtPercent(r.growth))
@@ -852,8 +890,11 @@
               e('tbody', {key:'tb'},
                 tableData.map(function(r) {
                   var bold = isBoldKey(r.product);
-                  return e('tr', { key: r.product, className: 'border-t border-slate-700/30 ' + (bold ? 'font-semibold' : '') }, [
-                    e('td', { key:'p', className: 'py-1 px-1 text-left' }, r.product === 'TOTAL' ? 'Weighted Total' : r.product),
+                  var indent = isIndentKey(r.product);
+                  var isGrandTotal = r.product === 'TOTAL' || r.product === 'ALL PRODUCTS';
+                  var rowCls = 'border-t border-slate-700/30 ' + (bold ? 'font-semibold bg-slate-700/30 ' : '') + (isGrandTotal ? 'font-bold bg-slate-600/40' : '');
+                  return e('tr', { key: r.product, className: rowCls }, [
+                    e('td', { key:'p', className: 'py-1 text-left ' + (indent ? 'pl-4 pr-1' : 'px-1') }, r.product === 'TOTAL' ? 'Weighted Total' : getDisplayName(r.product)),
                     e('td', { key:'py', className: 'py-1 px-1 text-right' }, fmtCompactMoney(r.prev)),
                     e('td', { key:'cy', className: 'py-1 px-1 text-right' }, fmtCompactMoney(r.curr)),
                     e('td', { key:'g', className: 'py-1 px-1 text-right ' + clsDelta(r.growth, true) }, fmtPercent(r.growth))
@@ -896,10 +937,12 @@
       function body(){
         return e('tbody',null, rows.map(function(r){
           var bold = isBoldKey(r.product) || r.product.toUpperCase()==='TOTAL';
-          var rowCls='border-t border-slate-700/30 hover:bg-slate-700/20 '+(bold?'font-semibold bg-slate-700/10':'');
+          var indent = isIndentKey(r.product);
+          var isGrandTotal = r.product==='TOTAL' || r.product==='ALL PRODUCTS';
+          var rowCls='border-t border-slate-700/30 hover:bg-slate-700/20 '+(bold?'font-semibold bg-slate-700/30 ':'')+(isGrandTotal?'font-bold bg-slate-600/40':'');
           return e('tr',{key:r.product, className:rowCls},
-            e('td',{key:'p',className:'px-2 py-2 text-left sticky left-0 bg-inherit z-10 text-xs lg:text-sm border-r border-slate-700/30'}, 
-              r.product==='TOTAL'?'All Products':r.product),
+            e('td',{key:'p',className:'py-2 text-left sticky left-0 bg-inherit z-10 text-xs lg:text-sm border-r border-slate-700/30 '+(indent?'pl-6 pr-2':'px-2')},
+              getDisplayName(r.product)),
             e('td',{key:'mpy',className:'px-1 py-2 text-right text-xs lg:text-sm whitespace-nowrap'}, r.mPY||0),
             e('td',{key:'mcy',className:'px-1 py-2 text-right text-xs lg:text-sm whitespace-nowrap'}, r.mCY||0),
             cell(r.mCh, r.goodUp),
@@ -941,10 +984,12 @@
       function body(){
         return e('tbody',null, rows.map(function(r){
           var bold = isBoldKey(r.product) || r.product.toUpperCase()==='TOTAL';
-          var rowCls='border-t border-slate-700/30 hover:bg-slate-700/20 '+(bold?'font-semibold bg-slate-700/10':'');
+          var indent = isIndentKey(r.product);
+          var isGrandTotal = r.product==='TOTAL' || r.product==='ALL PRODUCTS';
+          var rowCls='border-t border-slate-700/30 hover:bg-slate-700/20 '+(bold?'font-semibold bg-slate-700/30 ':'')+(isGrandTotal?'font-bold bg-slate-600/40':'');
           return e('tr',{key:r.product, className:rowCls},
-            e('td',{key:'p',className:'px-2 py-2 text-left sticky left-0 bg-inherit z-10 text-xs lg:text-sm border-r border-slate-700/30'}, 
-              r.product==='TOTAL'?'All Products':r.product),
+            e('td',{key:'p',className:'py-2 text-left sticky left-0 bg-inherit z-10 text-xs lg:text-sm border-r border-slate-700/30 '+(indent?'pl-6 pr-2':'px-2')},
+              getDisplayName(r.product)),
             e('td',{key:'mpy',className:'px-1 py-2 text-right text-xs lg:text-sm whitespace-nowrap'}, fmtCompactMoney(r.mPY)),
             e('td',{key:'mcy',className:'px-1 py-2 text-right text-xs lg:text-sm whitespace-nowrap'}, fmtCompactMoney(r.mCY)),
             cell(r.mCh, r.goodUp),
@@ -1039,9 +1084,9 @@
             ),
             e('tbody',null,
               topMetrics.map(function(m){
-                var rowCls='border-t border-slate-700/40 '+(isBoldKey(m.key)?'font-semibold':'');
-                return e('tr',{key:m.name,className:rowCls},
-                  e('td',{key:'p',className:'px-2 py-1 text-left'},m.name),
+                var rowCls='border-t border-slate-700/40 '+(m.isBold?'font-semibold bg-slate-700/30 ':'')+(m.isGrandTotal?'font-bold bg-slate-600/40':'');
+                return e('tr',{key:m.key,className:rowCls},
+                  e('td',{key:'p',className:'py-1 text-left '+(m.isIndent?'pl-6 pr-2':'px-2')},m.name),
                   e('td',{key:'c',className:'px-2 py-1 text-right'}, m.current==null?'—':m.current),
                   e('td',{key:'r',className:'px-2 py-1 text-right'}, fmtPercent(m.yoyRetention)),
                   e('td',{key:'v',className:'px-2 py-1 text-right'}, fmtPercent(m.cvr)),
