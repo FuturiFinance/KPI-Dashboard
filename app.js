@@ -381,7 +381,7 @@
               contractStartDate: (r['Contract Item Start Date'] || r.contractStartDate || '').trim(),
               contractEndDate: (r['Contract End Date'] || r.contractEndDate || '').trim(),
               paymentMethod: (r['Payment Method'] || r.paymentMethod || '').trim(),
-              contractRenewalStatus: (r['Contract Renewal Status'] || r.contractRenewalStatus || '').trim(),
+              contractRenewalStatus: (r['Contract Renewal Status'] || r['Renewal Status'] || r.contractRenewalStatus || '').trim(),
               annualContractValue: parseMoney(r['Annual Contract Value'] || r.annualContractValue || 0)
             };
           }).filter(function(r){ return r.parentCompany || r.station; });
@@ -3312,7 +3312,7 @@
             contractStartDate: (r['Contract Item Start Date'] || r.contractStartDate || '').trim(),
             contractEndDate: (r['Contract End Date'] || r.contractEndDate || '').trim(),
             paymentMethod: (r['Payment Method'] || r.paymentMethod || '').trim(),
-            contractRenewalStatus: (r['Contract Renewal Status'] || r.contractRenewalStatus || '').trim(),
+            contractRenewalStatus: (r['Contract Renewal Status'] || r['Renewal Status'] || r.contractRenewalStatus || '').trim(),
             annualContractValue: parseMoney(r['Annual Contract Value'] || r.annualContractValue || 0)
           };
         }).filter(function(r){ return r.parentCompany || r.station; });
